@@ -6,6 +6,7 @@ from controllers.array_action.errors import NoConnectionAvailableException, Fail
 from controllers.array_action.array_mediator_xiv import XIVArrayMediator
 from controllers.array_action.array_mediator_svc import SVCArrayMediator
 from controllers.array_action.array_mediator_ds8k import DS8KArrayMediator
+from controllers.array_action.array_mediator_santricity import SANtricityArrayMediator
 
 connection_lock_dict = {}
 array_connections_dict = {}
@@ -46,6 +47,7 @@ class ArrayConnectionManager:
             XIVArrayMediator.array_type: XIVArrayMediator,
             SVCArrayMediator.array_type: SVCArrayMediator,
             DS8KArrayMediator.array_type: DS8KArrayMediator,
+            SANtricityArrayMediator.array_type: SANtricityArrayMediator,
         }
 
         self.array_type = array_type
@@ -119,6 +121,7 @@ class ArrayConnectionManager:
         for storage_type, port in [(XIVArrayMediator.array_type, XIVArrayMediator.port),
                                    (DS8KArrayMediator.array_type, DS8KArrayMediator.port),
                                    (SVCArrayMediator.array_type, SVCArrayMediator.port),
+                                   (SANtricityArrayMediator.array_type, SANtricityArrayMediator.port),
                                    ]:
 
             for endpoint in self.endpoints:
