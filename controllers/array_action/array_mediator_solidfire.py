@@ -1,3 +1,4 @@
+import os
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
 from controllers.array_action.array_action_types import Volume, Host
@@ -51,13 +52,17 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
         else:
             account_id = account['accountID']
 
+        # Apply prefix to volume name
+        prefix = os.getenv("SOLIDFIRE_PREFIX", "")
+        final_name = "{}{}".format(prefix, name)
+
         try:
-            vol_res = self.client.create_volume(name, size_in_bytes, account_id)
+            vol_res = self.client.create_volume(final_name, size_in_bytes, account_id)
             # Fetch full details to return Volume object
             return self.get_volume(vol_res['volumeID'])
         except Exception as ex:
             logger.exception("Failed to create volume")
-            raise array_errors.VolumeCreationError(name)
+            raise array_errors.VolumeCreationError(final_name)
 
     def delete_volume(self, volume_id):
         try:
@@ -78,16 +83,19 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
 
     def map_volume(self, volume_id, host_name, connectivity_type):
         # SolidFire uses Volume Access Groups (VAGs) to map volumes to initiators.
-        # We treat the Host Name as the VAG Name.
+        # We treat the Host Name as the VAG Name, optionally prefixed.
         
+        vag_prefix = os.getenv("SOLIDFIRE_PREFIX", "")
+        target_vag_name = "{}{}".format(vag_prefix, host_name)
+
         # 1. Find VAG by name
         vags = self.client.list_volume_access_groups().get('volumeAccessGroups', [])
-        vag = next((v for v in vags if v['name'] == host_name), None)
+        vag = next((v for v in vags if v['name'] == target_vag_name), None)
         
         if not vag:
             # If VAG doesn't exist, we can't map because we don't know the initiators here.
             # The abstract class calls get_host_by_host_identifiers first, which should create it.
-            raise array_errors.HostNotFoundError(host_name)
+            raise array_errors.HostNotFoundError(target_vag_name)
 
         # 2. Add volume to VAG
         try:
@@ -102,8 +110,11 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
             raise array_errors.MappingError(volume_id, host_name, ex)
 
     def unmap_volume(self, volume_id, host_name):
+        vag_prefix = os.getenv("SOLIDFIRE_PREFIX", "")
+        target_vag_name = "{}{}".format(vag_prefix, host_name)
+
         vags = self.client.list_volume_access_groups().get('volumeAccessGroups', [])
-        vag = next((v for v in vags if v['name'] == host_name), None)
+        vag = next((v for v in vags if v['name'] == target_vag_name), None)
         
         if vag:
             try:
@@ -112,11 +123,14 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
                 logger.warning("Failed to unmap volume: {}".format(ex))
 
     def get_host_by_name(self, host_name):
+        vag_prefix = os.getenv("SOLIDFIRE_PREFIX", "")
+        target_vag_name = "{}{}".format(vag_prefix, host_name)
+
         vags = self.client.list_volume_access_groups().get('volumeAccessGroups', [])
-        vag = next((v for v in vags if v['name'] == host_name), None)
+        vag = next((v for v in vags if v['name'] == target_vag_name), None)
         
         if not vag:
-            raise array_errors.HostNotFoundError(host_name)
+            raise array_errors.HostNotFoundError(target_vag_name)
             
         return Host(name=host_name, connectivity_types=[array_settings.ISCSI_CONNECTIVITY_TYPE], iscsi_iqns=vag['initiators'])
 
