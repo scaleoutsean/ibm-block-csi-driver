@@ -1,0 +1,66 @@
+name: Build and Publish CSI Driver
+
+on:
+  push:
+    branches: [ "santricity" ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Controller
+        id: meta-controller
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-controller
+          tags: |
+            type=sha
+            type=ref,event=branch
+            latest
+
+      - name: Build and push Controller image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile-csi-controller
+          push: true
+          tags: ${{ steps.meta-controller.outputs.tags }}
+          labels: ${{ steps.meta-controller.outputs.labels }}
+
+      - name: Extract metadata (tags, labels) for Node
+        id: meta-node
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-node
+          tags: |
+            type=sha
+            type=ref,event=branch
+            latest
+
+      - name: Build and push Node image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile-csi-node
+          push: true
+          tags: ${{ steps.meta-node.outputs.tags }}
+          labels: ${{ steps.meta-node.outputs.labels }}
