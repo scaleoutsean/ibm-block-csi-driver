@@ -7,6 +7,7 @@ from controllers.array_action.array_mediator_xiv import XIVArrayMediator
 from controllers.array_action.array_mediator_svc import SVCArrayMediator
 from controllers.array_action.array_mediator_ds8k import DS8KArrayMediator
 from controllers.array_action.array_mediator_santricity import SANtricityArrayMediator
+from controllers.array_action.array_mediator_solidfire import SolidFireArrayMediator
 
 connection_lock_dict = {}
 array_connections_dict = {}
@@ -48,6 +49,7 @@ class ArrayConnectionManager:
             SVCArrayMediator.array_type: SVCArrayMediator,
             DS8KArrayMediator.array_type: DS8KArrayMediator,
             SANtricityArrayMediator.array_type: SANtricityArrayMediator,
+            SolidFireArrayMediator.array_type: SolidFireArrayMediator,
         }
 
         self.array_type = array_type
@@ -122,6 +124,7 @@ class ArrayConnectionManager:
                                    (DS8KArrayMediator.array_type, DS8KArrayMediator.port),
                                    (SVCArrayMediator.array_type, SVCArrayMediator.port),
                                    (SANtricityArrayMediator.array_type, SANtricityArrayMediator.port),
+                                   (SolidFireArrayMediator.array_type, SolidFireArrayMediator.port),
                                    ]:
 
             for endpoint in self.endpoints:
