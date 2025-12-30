@@ -10,6 +10,11 @@ from controllers.common.csi_logger import get_stdout_logger
 
 logger = get_stdout_logger()
 
+
+def _sf_safe_name(name):
+    # SolidFire only allows alnum and '-', so translate underscores to dashes.
+    return name.replace("_", "-")
+
 class SolidFireArrayMediator(ArrayMediatorAbstract):
     ARRAY_ACTIONS = {}
 
@@ -83,9 +88,9 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
         else:
             account_id = account['accountID']
 
-        # Apply optional prefix to volume name; default to none to avoid underscore requirements in VAG names.
+        # Apply optional prefix to volume name and sanitize for SolidFire constraints.
         prefix = os.getenv("SOLIDFIRE_PREFIX", "")
-        final_name = "{}{}".format(prefix, name)
+        final_name = _sf_safe_name("{}{}".format(prefix, name))
 
         try:
             vol_res = self.client.create_volume(final_name, size_in_bytes, account_id)
@@ -111,8 +116,9 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
         """
         try:
             vol_data = None
-            # First, try by name
-            vol_data = self.client.list_volumes_by_name(volume_name)
+            safe_name = _sf_safe_name(volume_name)
+            # First, try by sanitized name
+            vol_data = self.client.list_volumes_by_name(safe_name)
             # If not found and the name looks like an ID, try by ID
             if not vol_data:
                 try:
