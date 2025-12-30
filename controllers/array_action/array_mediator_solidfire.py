@@ -83,8 +83,8 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
         else:
             account_id = account['accountID']
 
-        # Apply prefix to volume name
-        prefix = os.getenv("SOLIDFIRE_PREFIX", "ibm_csi")
+        # Apply optional prefix to volume name; default to none to avoid underscore requirements in VAG names.
+        prefix = os.getenv("SOLIDFIRE_PREFIX", "")
         final_name = "{}{}".format(prefix, name)
 
         try:
@@ -111,6 +111,106 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
             return self._to_volume_object(vol_data)
         except Exception:
             raise array_errors.ObjectNotFoundError(volume_id)
+
+    # --------- Required abstract API implementations ---------
+    def get_volume_mappings(self, volume_id):
+        # Return no existing mappings so map_volume_by_initiators will map.
+        return {}
+
+    def get_array_fc_wwns(self, host_name):
+        return []
+
+    def get_host_connectivity_ports(self, host_name):
+        return []
+
+    def get_host_connectivity_type(self, host_name):
+        return array_settings.ISCSI_CONNECTIVITY_TYPE
+
+    def get_host_io_group(self, host_name):
+        return None
+
+    def get_iscsi_targets_by_iqn(self, host_name):
+        # SolidFire uses a shared SVIP; return it as a single target.
+        info = self.client.get_cluster_info()
+        return [info['clusterInfo']['svip']]
+
+    def validate_supported_space_efficiency(self, space_efficiency):
+        # SolidFire thin-provisions by default; accept None or "thin".
+        if space_efficiency and space_efficiency.lower() not in ("thin",):
+            raise array_errors.SpaceEfficiencyNotSupported(space_efficiency)
+
+    def verify_host_partition(self, host, partition_name):
+        return None
+
+    def verify_volume_partition(self, volume, partition_name):
+        return None
+
+    def verify_volume_group_partition(self, volume_group, partition_name):
+        return None
+
+    def create_host(self, host_name, initiators, connectivity_types, io_group=None, port=None, nvme_nqn=None,
+                    host_cluster_identifiers=None, host_priorities=None, port_set_id=None):
+        # SolidFire host construct is a VAG; mapping happens via VAGs, so no host to create.
+        return Host(name=host_name, connectivity_types=[array_settings.ISCSI_CONNECTIVITY_TYPE], iscsi_iqns=initiators)
+
+    def delete_host(self, host_name):
+        return None
+
+    def add_ports_to_host(self, host_name, ports, force=None):
+        return None
+
+    def remove_ports_from_host(self, host_name, ports, force=None):
+        return None
+
+    def add_io_group_to_host(self, host_name, io_groups):
+        return None
+
+    def remove_io_group_from_host(self, host_name, io_groups):
+        return None
+
+    def change_host_protocol(self, host_name, protocol):
+        return None
+
+    def create_snapshot(self, volume_id, snapshot_name, pool, space_efficiency, is_virt_snap_func):
+        raise NotImplementedError()
+
+    def delete_snapshot(self, snapshot_id, internal_snapshot_id, snapshot_name=None):
+        raise NotImplementedError()
+
+    def get_snapshot(self, volume_id, snapshot_name, pool, is_virt_snap_func):
+        raise array_errors.ObjectNotFoundError(snapshot_name)
+
+    def create_replication(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def get_replication(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def promote_replication_volume(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def demote_replication_volume(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def delete_replication(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def expand_volume(self, volume_id, required_bytes, partition_name=None):
+        self.client.modify_volume(volume_id, size=required_bytes)
+
+    def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
+        if object_type == array_settings.VOLUME_TYPE_NAME:
+            try:
+                return self.get_volume(object_id)
+            except Exception:
+                return None
+        return None
+
+    def is_active(self):
+        return True
+
+    def register_plugin(self, unique_key, metadata, version):
+        return None
 
     def map_volume(self, volume_id, host_name, connectivity_type):
         # SolidFire uses Volume Access Groups (VAGs) to map volumes to initiators.
