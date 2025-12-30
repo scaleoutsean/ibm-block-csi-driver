@@ -105,12 +105,27 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
             logger.exception("Failed to delete volume")
             raise array_errors.ObjectNotFoundError(volume_id)
 
-    def get_volume(self, volume_id):
+    def get_volume(self, volume_name, pool=None, is_virt_snap_func=None):
+        """
+        CSI passes (name, pool, is_virt_snap_func); also handle numeric IDs for internal calls.
+        """
         try:
-            vol_data = self.client.get_volume(volume_id)
+            vol_data = None
+            # First, try by name
+            vol_data = self.client.list_volumes_by_name(volume_name)
+            # If not found and the name looks like an ID, try by ID
+            if not vol_data:
+                try:
+                    vol_id = int(volume_name)
+                    vol_data = self.client.get_volume(vol_id)
+                except Exception:
+                    vol_data = None
+
+            if not vol_data:
+                raise array_errors.ObjectNotFoundError(volume_name)
             return self._to_volume_object(vol_data)
         except Exception:
-            raise array_errors.ObjectNotFoundError(volume_id)
+            raise array_errors.ObjectNotFoundError(volume_name)
 
     # --------- Required abstract API implementations ---------
     def get_volume_mappings(self, volume_id):
