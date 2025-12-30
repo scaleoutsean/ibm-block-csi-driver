@@ -21,6 +21,37 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
     def port(self):
         return 443
 
+    @ClassProperty
+    def max_object_name_length(self):
+        # SolidFire supports long names; keep conservative to align with common CSI limits.
+        return 64
+
+    @ClassProperty
+    def max_object_prefix_length(self):
+        return 32
+
+    @ClassProperty
+    def max_connections(self):
+        return 2
+
+    @ClassProperty
+    def minimal_volume_size_in_bytes(self):
+        # SolidFire minimum volume size is 100 MB.
+        return 100 * 1024 * 1024
+
+    @ClassProperty
+    def maximal_volume_size_in_bytes(self):
+        # SolidFire supports very large volumes; set to 100 TB for practical upper bound.
+        return 100 * 1024 * 1024 * 1024 * 1024
+
+    @ClassProperty
+    def max_lun_retries(self):
+        return 10
+
+    @ClassProperty
+    def default_object_prefix(self):
+        return "CSI"
+
     def __init__(self, user, password, endpoint):
         super().__init__(user, password, endpoint)
         # Endpoint is the MVIP
