@@ -7,6 +7,8 @@ from threading import RLock
 import controllers.array_action.errors as array_errors
 from controllers.array_action.array_connection_pool import ConnectionPool
 from controllers.array_action.array_mediator_ds8k import DS8KArrayMediator
+from controllers.array_action.array_mediator_santricity import SANtricityArrayMediator
+from controllers.array_action.array_mediator_solidfire import SolidFireArrayMediator
 from controllers.array_action.array_mediator_svc import SVCArrayMediator
 from controllers.array_action.array_mediator_xiv import XIVArrayMediator
 from controllers.array_action.errors import FailedToFindStorageSystemType
@@ -18,21 +20,19 @@ _array_agents = {}
 lock = RLock()
 
 array_type_to_port = OrderedDict()
-array_type_to_mediator = {}
+array_type_to_port[XIVArrayMediator.array_type] = XIVArrayMediator.port
+array_type_to_port[DS8KArrayMediator.array_type] = DS8KArrayMediator.port
+array_type_to_port[SVCArrayMediator.array_type] = SVCArrayMediator.port
+array_type_to_port[SANtricityArrayMediator.array_type] = SANtricityArrayMediator.port
+array_type_to_port[SolidFireArrayMediator.array_type] = SolidFireArrayMediator.port
 
-if SVCArrayMediator.is_custom_port():
-    array_type_to_port[SVCArrayMediator.array_type] = SVCArrayMediator.port
-    array_type_to_mediator[SVCArrayMediator.array_type] = SVCArrayMediator
-else:
-    # Don't change the order here since svc port (22) is also opened in ds8k.
-    array_type_to_port[XIVArrayMediator.array_type] = XIVArrayMediator.port
-    array_type_to_port[DS8KArrayMediator.array_type] = DS8KArrayMediator.port
-    array_type_to_port[SVCArrayMediator.array_type] = SVCArrayMediator.port
-
-    # here order is not important
-    array_type_to_mediator[XIVArrayMediator.array_type] = XIVArrayMediator
-    array_type_to_mediator[DS8KArrayMediator.array_type] = DS8KArrayMediator
-    array_type_to_mediator[SVCArrayMediator.array_type] = SVCArrayMediator
+array_type_to_mediator = {
+    XIVArrayMediator.array_type: XIVArrayMediator,
+    DS8KArrayMediator.array_type: DS8KArrayMediator,
+    SVCArrayMediator.array_type: SVCArrayMediator,
+    SANtricityArrayMediator.array_type: SANtricityArrayMediator,
+    SolidFireArrayMediator.array_type: SolidFireArrayMediator,
+}
 
 array_type_cache = {}
 
