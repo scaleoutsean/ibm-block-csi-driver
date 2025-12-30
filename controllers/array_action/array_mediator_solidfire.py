@@ -53,7 +53,7 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
             account_id = account['accountID']
 
         # Apply prefix to volume name
-        prefix = os.getenv("SOLIDFIRE_PREFIX", "")
+        prefix = os.getenv("SOLIDFIRE_PREFIX", "ibm_csi")
         final_name = "{}{}".format(prefix, name)
 
         try:

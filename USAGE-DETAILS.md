@@ -8,7 +8,7 @@ This section shows how to:
 - Create storage class `gold`.
 - Create PVC `demo-pvc-file-system`from the storage class `gold` and show some details on the created PVC and PV.
 - Create StatefulSet application `demo-statefulset-file-system` and observe the mountpoint \ multipath device that was created by the driver.
-- Write some data inside the 'demo-statefulset-file-system', delete the 'demo-statefulset-file-system' and then create it again, to validate that the data remains.
+- Write some data inside the `demo-statefulset-file-system`, delete the `demo-statefulset-file-system` and then create it again, to validate that the data remains.
 
 Create secret and storage class:
 
