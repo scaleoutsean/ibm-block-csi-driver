@@ -303,13 +303,15 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
         # We need to find a VAG that contains these initiators, or create one.
         # For simplicity, we'll assume the VAG name should match the K8s Node Name (which we don't have here directly).
         # But wait, the caller usually passes initiators to find the host.
-        
-        # Search all VAGs for these initiators
+
+        # Search all VAGs for matching iSCSI initiators (case-insensitive).
+        req_iqns = {iqn.lower() for iqn in initiators.iscsi_iqns}
         vags = self.client.list_volume_access_groups().get('volumeAccessGroups', [])
         for vag in vags:
-            if any(i in vag['initiators'] for i in initiators):
+            vag_iqns = {iqn.lower() for iqn in vag.get('initiators', [])}
+            if req_iqns & vag_iqns:
                 return vag['name'], [array_settings.ISCSI_CONNECTIVITY_TYPE]
-        
+
         raise array_errors.HostNotFoundError(initiators)
 
     def _get_array_initiators(self, host_name, connectivity_type):
