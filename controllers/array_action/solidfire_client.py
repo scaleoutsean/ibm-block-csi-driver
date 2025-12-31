@@ -85,6 +85,9 @@ class SolidFireClient:
                 return vol
         return None
 
+    def list_active_volumes(self):
+        return self._request("ListActiveVolumes", {})
+
     def get_account_by_name(self, username):
         result = self._request("GetAccountByName", {"username": username})
         return result.get('account')

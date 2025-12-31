@@ -165,20 +165,7 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
         CSI passes (name, pool, is_virt_snap_func); also handle numeric IDs for internal calls.
         """
         try:
-            vol_data = None
-            safe_name = _sf_safe_name(volume_name)
-            # First, try by sanitized name
-            vol_data = self.client.list_volumes_by_name(safe_name)
-            # If not found and the name looks like an ID, try by ID
-            if not vol_data:
-                try:
-                    vol_id = int(volume_name)
-                    vol_data = self.client.get_volume(vol_id)
-                except Exception:
-                    vol_data = None
-
-            if not vol_data:
-                raise array_errors.ObjectNotFoundError(volume_name)
+            vol_data = self._get_volume_data(volume_name)
             return self._to_volume_object(vol_data)
         except Exception:
             raise array_errors.ObjectNotFoundError(volume_name)
@@ -304,6 +291,9 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
         vag_prefix = os.getenv("SOLIDFIRE_PREFIX", "")
         target_vag_name = "{}{}".format(vag_prefix, host_name)
 
+        # Resolve numeric volume ID regardless of strong ID format.
+        internal_id, _ = self._resolve_volume_internal_id(volume_id)
+
         # 1. Find VAG by name
         vags = self.client.list_volume_access_groups().get('volumeAccessGroups', [])
         vag = next((v for v in vags if v['name'] == target_vag_name), None)
@@ -315,14 +305,14 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
 
         # 2. Add volume to VAG
         try:
-            self.client.add_volumes_to_volume_access_group(vag['volumeAccessGroupID'], [volume_id])
+            self.client.add_volumes_to_volume_access_group(vag['volumeAccessGroupID'], [internal_id])
             # Retrieve actual LUN assignment from the VAG so the node stages the correct LUN.
             lun = '0'
             try:
                 lun_info = self.client.get_volume_access_group_lun_assignments(vag['volumeAccessGroupID'])
                 assignments = lun_info.get('volumeAccessGroupLunAssignments', {})
                 for entry in assignments.get('lunAssignments', []):
-                    if int(entry.get('volumeID')) == int(volume_id):
+                    if int(entry.get('volumeID')) == int(internal_id):
                         lun = str(entry.get('lun'))
                         break
             except Exception as ex:
@@ -335,12 +325,14 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
         vag_prefix = os.getenv("SOLIDFIRE_PREFIX", "")
         target_vag_name = "{}{}".format(vag_prefix, host_name)
 
+        internal_id, _ = self._resolve_volume_internal_id(volume_id)
+
         vags = self.client.list_volume_access_groups().get('volumeAccessGroups', [])
         vag = next((v for v in vags if v['name'] == target_vag_name), None)
         
         if vag:
             try:
-                self.client.remove_volumes_from_volume_access_group(vag['volumeAccessGroupID'], [volume_id])
+                self.client.remove_volumes_from_volume_access_group(vag['volumeAccessGroupID'], [internal_id])
             except Exception as ex:
                 logger.warning("Failed to unmap volume: {}".format(ex))
 
@@ -382,8 +374,8 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
         # Return mapping of target IQN -> list of portals as expected by publish context.
         # SolidFire provides the volume IQN per volume; use that as the target name.
         try:
-            vol = self.client.get_volume(volume_id)
-            volume_iqn = vol.get('iqn') or "solidfire-{}".format(volume_id)
+            _, vol = self._resolve_volume_internal_id(volume_id)
+            volume_iqn = vol.get('iqn') or "solidfire-{}".format(vol.get('volumeID'))
         except Exception:
             volume_iqn = "solidfire-{}".format(volume_id)
 
@@ -405,6 +397,33 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
             array_type=self.array_type,
             pool='default' # SolidFire has one pool
         )
+
+    def _get_volume_data(self, volume_identifier):
+        # Accept strong ID (NAA/EUI), name, or numeric volumeID.
+        # This keeps SolidFire API calls using numeric IDs while CSI volume_id carries strong IDs.
+        try:
+            # Fast path: numeric ID
+            vol_id = int(volume_identifier)
+            return self.client.get_volume(vol_id)
+        except Exception:
+            pass
+
+        safe_name = _sf_safe_name(volume_identifier)
+        vol_data = self.client.list_volumes_by_name(safe_name)
+        if vol_data:
+            return vol_data
+
+        # Fallback: scan active volumes for matching strong ID (naa/eui/name/volumeID string)
+        volumes = self.client.list_active_volumes().get('volumes', [])
+        for vol in volumes:
+            if volume_identifier in (vol.get('scsiNAADeviceID'), vol.get('scsiEUIDeviceID'),
+                                     vol.get('name'), str(vol.get('volumeID'))):
+                return vol
+        raise array_errors.ObjectNotFoundError(volume_identifier)
+
+    def _resolve_volume_internal_id(self, volume_identifier):
+        vol = self._get_volume_data(volume_identifier)
+        return str(vol['volumeID']), vol
 
     def copy_to_existing_volume(self, volume_id, source_id, source_capacity_in_bytes, minimum_volume_size_in_bytes):
         raise NotImplementedError()
