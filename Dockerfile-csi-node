@@ -28,9 +28,8 @@ RUN make ibm-block-csi-driver
 
 # Final stage
 FROM registry.access.redhat.com/ubi9-minimal:9.7-1773939694
-# Install sg3_utils and try multipath package (name differs across repos). Fallback keeps build working even if
-# multipath is unavailable in the base image repos.
-RUN microdnf install -y sg3_utils || exit 1 \
+# Install required sg3_utils (with libs) and try multipath (optional) from any available repo.
+RUN microdnf install -y sg3_utils sg3_utils-libs || exit 1 \
  && (microdnf install -y device-mapper-multipath || microdnf install -y multipath-tools || echo "multipath not available; falling back") \
  && microdnf clean all
 
