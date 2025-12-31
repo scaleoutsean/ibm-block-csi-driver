@@ -4,6 +4,7 @@ import controllers.array_action.settings as array_settings
 from controllers.array_action.array_action_types import Volume, Host
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.servers import settings as servers_settings
+from controllers.servers import utils
 from controllers.array_action.solidfire_client import SolidFireClient
 from controllers.array_action.utils import ClassProperty
 from controllers.common import settings
