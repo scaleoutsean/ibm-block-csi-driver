@@ -8,16 +8,16 @@ if [ ! -d "${DIR}" ]; then
     exit 1
 fi
 
-# Prefer host binary if present; otherwise fall back to container binary to avoid missing sg3_utils on the host.
-if [ -x "${DIR}/usr/bin/${ME}" ] || [ -x "${DIR}/usr/sbin/${ME}" ] || [ -x "${DIR}/sbin/${ME}" ] || [ -x "${DIR}/bin/${ME}" ]; then
-    exec chroot "$DIR" /usr/bin/env -i PATH="/sbin:/bin:/usr/bin:/usr/sbin" "${ME}" "${@:1}"
-fi
-
+# Prefer container binary (has sg3_utils/multipath deps). If missing, fall back to host binary via chroot.
 for p in /usr/bin /usr/sbin /sbin /bin; do
     if [ -x "${p}/${ME}" ]; then
         exec "${p}/${ME}" "${@:1}"
     fi
 done
+
+if [ -x "${DIR}/usr/bin/${ME}" ] || [ -x "${DIR}/usr/sbin/${ME}" ] || [ -x "${DIR}/sbin/${ME}" ] || [ -x "${DIR}/bin/${ME}" ]; then
+    exec chroot "$DIR" /usr/bin/env -i PATH="/sbin:/bin:/usr/bin:/usr/sbin" "${ME}" "${@:1}"
+fi
 
 echo "${ME} not found on host or in container"
 exit 127
