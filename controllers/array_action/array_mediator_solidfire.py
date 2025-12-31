@@ -316,12 +316,18 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
         # 2. Add volume to VAG
         try:
             self.client.add_volumes_to_volume_access_group(vag['volumeAccessGroupID'], [volume_id])
-            # SolidFire doesn't have per-host LUN IDs in the same way. 
-            # The LUN ID is usually the Volume ID (low 32 bits) or assigned dynamically.
-            # For iSCSI, the target IQN is usually the volume IQN.
-            # But if using VAG, the LUN ID is determined by the order or explicit assignment.
-            # For MVP, let's return '0' and rely on the Node plugin to discover the LUN.
-            return '0' 
+            # Retrieve actual LUN assignment from the VAG so the node stages the correct LUN.
+            lun = '0'
+            try:
+                lun_info = self.client.get_volume_access_group_lun_assignments(vag['volumeAccessGroupID'])
+                assignments = lun_info.get('volumeAccessGroupLunAssignments', {})
+                for entry in assignments.get('lunAssignments', []):
+                    if int(entry.get('volumeID')) == int(volume_id):
+                        lun = str(entry.get('lun'))
+                        break
+            except Exception as ex:
+                logger.warning("Could not fetch LUN assignment for volume %s: %s", volume_id, ex)
+            return lun
         except Exception as ex:
             raise array_errors.MappingError(volume_id, host_name, ex)
 
