@@ -107,9 +107,25 @@ class SolidFireClient:
         return self._request("AddInitiatorsToVolumeAccessGroup", params)
 
     def add_volumes_to_volume_access_group(self, vag_id, volume_ids):
+        # SolidFire expects the full volume list when updating a VAG, not just deltas.
+        vag_id = int(vag_id)
+        existing_volumes = []
+        try:
+            vags = self.list_volume_access_groups().get("volumeAccessGroups", [])
+            vag = next((v for v in vags if v.get("volumeAccessGroupID") == vag_id), None)
+            if vag:
+                existing_volumes = vag.get("volumes", [])
+        except Exception as ex:
+            logger.warning("Failed to load existing VAG volumes for %s: %s", vag_id, ex)
+
+        merged = []
+        for vid in existing_volumes + [int(v) for v in volume_ids]:
+            if vid not in merged:
+                merged.append(vid)
+
         params = {
             "volumeAccessGroupID": vag_id,
-            "volumes": [int(v) for v in volume_ids]
+            "volumes": merged
         }
         return self._request("AddVolumesToVolumeAccessGroup", params)
 
