@@ -740,6 +740,10 @@ func (o GetDmsPathHelperGeneric) ExtractVolumeId(mpathDeviceName string, mpathdO
 
 func convertScsiIdToNguid(scsiId string) string {
 	logger.Infof("Converting scsi uuid : %s to nguid", scsiId)
+	if len(scsiId) < WwnVendorIdentifierEnd {
+		logger.Warningf("Cannot convert scsi id to nguid, id too short: %s", scsiId)
+		return scsiId
+	}
 	oui := scsiId[1:WwnOuiEnd]
 	vendorIdentifier := scsiId[WwnOuiEnd:WwnVendorIdentifierEnd]
 	vendorIdentifierExtension := scsiId[WwnVendorIdentifierEnd:]
