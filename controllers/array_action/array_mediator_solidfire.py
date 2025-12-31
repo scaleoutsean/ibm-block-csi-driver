@@ -387,9 +387,11 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
         return {volume_iqn: [svip]}
 
     def _to_volume_object(self, vol_data):
+        # Use NAA/EUI as strong ID for multipath-friendly WWID; keep numeric volumeID as internal ID for API calls.
+        strong_id = vol_data.get('scsiNAADeviceID') or vol_data.get('scsiEUIDeviceID') or str(vol_data['volumeID'])
         return Volume(
             capacity_bytes=int(vol_data['totalSize']),
-            id=str(vol_data['volumeID']),
+            id=str(strong_id),
             internal_id=str(vol_data['volumeID']),
             name=vol_data['name'],
             array_address=self.endpoint[0], # MVIP
