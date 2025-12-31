@@ -217,7 +217,18 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
         raise NotImplementedError()
 
     def expand_volume(self, volume_id, required_bytes, partition_name=None):
-        self.client.modify_volume(volume_id, size=required_bytes)
+        try:
+            current = self.client.get_volume(volume_id)['totalSize']
+            if int(required_bytes) <= int(current):
+                raise array_errors.InvalidArgumentError(
+                    "Requested size {} must be greater than current size {}".format(required_bytes, current)
+                )
+            self.client.modify_volume(volume_id, required_bytes)
+        except array_errors.InvalidArgumentError:
+            raise
+        except Exception as ex:
+            logger.exception("Failed to expand volume")
+            raise array_errors.InvalidArgumentError(str(ex))
 
     def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
         if object_type == array_settings.VOLUME_TYPE_NAME:
