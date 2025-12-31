@@ -19,6 +19,54 @@ def _sf_safe_name(name):
 class SolidFireArrayMediator(ArrayMediatorAbstract):
     ARRAY_ACTIONS = {}
 
+    def map_volume_by_initiators(self, vol_id, initiators, exclusive_access=True):
+        """Override to return iSCSI targets as a dict (iqn -> [ips]) required by node utils."""
+        logger.debug("mapping volume : {0}".format(vol_id))
+        mappings = self.get_volume_mappings(vol_id)
+        if exclusive_access and len(mappings) > 1:
+            raise array_errors.VolumeAlreadyMappedToDifferentHostsError(mappings)
+
+        if len(mappings) >= 1:
+            logger.debug("{0} mappings have been found for volume. the mappings are: {1}".format(len(mappings), mappings))
+            for mapping_host_name in mappings:
+                host = self.get_host_by_name(mapping_host_name)
+                if host.initiators in initiators:
+                    logger.debug("idempotent case - volume is already mapped to host.")
+                    lun = mappings[mapping_host_name]
+                    logger.debug("hostname : {}, connectivity_types  : {}".format(host.name, host.connectivity_types))
+                    connectivity_type = utils.choose_connectivity_type(host.connectivity_types)
+                    array_initiators = self._get_array_initiators_for_volume(vol_id, host.name, connectivity_type)
+                    return lun, connectivity_type, array_initiators
+                logger.debug("volume is already mapped to a host but doesn't match initiators continue search." " host initiators: {} request initiators: {}.".format(host.initiators, initiators))
+
+        if exclusive_access and len(mappings) == 1:
+            raise array_errors.VolumeAlreadyMappedToDifferentHostsError(mappings)
+
+        logger.debug("no mappings were found for volume. mapping volume : {0}".format(vol_id))
+
+        host_name, connectivity_types = self.get_host_by_host_identifiers(initiators)
+
+        logger.debug("hostname : {}, connectivity_types  : {}".format(host_name, connectivity_types))
+
+        connectivity_type = utils.choose_connectivity_type(connectivity_types)
+
+        try:
+            lun = self.map_volume(vol_id, host_name, connectivity_type)
+            logger.debug("lun : {}".format(lun))
+        except array_errors.LunAlreadyInUseError as ex:
+            logger.warning("Lun was already in use. re-trying the operation. {0}".format(ex))
+            for i in range(self.max_lun_retries - 1):
+                try:
+                    lun = self.map_volume(vol_id, host_name, connectivity_type)
+                    break
+                except array_errors.LunAlreadyInUseError as inner_ex:
+                    logger.warning("re-trying map volume. try #{0}. {1}".format(i, inner_ex))
+            else:
+                raise ex
+
+        array_initiators = self._get_array_initiators_for_volume(vol_id, host_name, connectivity_type)
+        return lun, connectivity_type, array_initiators
+
     @ClassProperty
     def array_type(self):
         return settings.ARRAY_TYPE_SOLIDFIRE
@@ -152,9 +200,12 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
         return None
 
     def get_iscsi_targets_by_iqn(self, host_name):
-        # SolidFire uses a shared SVIP; return it as a single target.
+        # SolidFire uses a shared SVIP; per volume the target IQN is the volume IQN.
+        # We cannot look up by host_name alone, so this method is not used directly.
+        # See _get_array_initiators_for_volume for the correct per-volume mapping.
         info = self.client.get_cluster_info()
-        return [info['clusterInfo']['svip']]
+        svip = info['clusterInfo']['svip']
+        return {"solidfire": [svip]}
 
     def validate_supported_space_efficiency(self, space_efficiency):
         # SolidFire thin-provisions by default; accept None or "thin".
@@ -315,13 +366,24 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
         raise array_errors.HostNotFoundError(initiators)
 
     def _get_array_initiators(self, host_name, connectivity_type):
-        # Return the SVIP (Storage Virtual IP)
-        # In a real implementation, we might query GetClusterInfo to find the SVIP.
-        # For now, we'll hardcode or derive it.
-        # Let's query cluster info.
+        # Deprecated for SolidFire iSCSI; use _get_array_initiators_for_volume instead.
         info = self.client.get_cluster_info()
         svip = info['clusterInfo']['svip']
-        return [svip]
+        return {"solidfire": [svip]}
+
+    def _get_array_initiators_for_volume(self, volume_id, host_name, connectivity_type):
+        # Return mapping of target IQN -> list of portals as expected by publish context.
+        # SolidFire provides the volume IQN per volume; use that as the target name.
+        try:
+            vol = self.client.get_volume(volume_id)
+            volume_iqn = vol.get('iqn') or "solidfire-{}".format(volume_id)
+        except Exception:
+            volume_iqn = "solidfire-{}".format(volume_id)
+
+        info = self.client.get_cluster_info()
+        svip = info['clusterInfo']['svip']
+
+        return {volume_iqn: [svip]}
 
     def _to_volume_object(self, vol_data):
         return Volume(
