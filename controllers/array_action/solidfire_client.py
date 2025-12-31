@@ -122,3 +122,10 @@ class SolidFireClient:
     
     def list_volume_access_groups(self):
         return self._request("ListVolumeAccessGroups", {})
+
+    def modify_volume(self, volume_id, total_size_bytes):
+        params = {
+            "volumeID": int(volume_id),
+            "totalSize": int(total_size_bytes)
+        }
+        return self._request("ModifyVolume", params)
