@@ -3,6 +3,7 @@ import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
 from controllers.array_action.array_action_types import Volume, Host
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
+from controllers.servers import settings as servers_settings
 from controllers.array_action.solidfire_client import SolidFireClient
 from controllers.array_action.utils import ClassProperty
 from controllers.common import settings
@@ -231,7 +232,7 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
             raise array_errors.InvalidArgumentError(str(ex))
 
     def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
-        if object_type == array_settings.VOLUME_TYPE_NAME:
+        if object_type == servers_settings.VOLUME_TYPE_NAME:
             try:
                 return self.get_volume(object_id)
             except Exception:
