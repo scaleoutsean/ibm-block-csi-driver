@@ -106,7 +106,7 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
             self.client.delete_volume(volume_id)
         except Exception as ex:
             # SolidFire throws error if volume doesn't exist, but we should be idempotent
-            if "xVolumeIDDoesNotExist" in str(ex):
+            if "xVolumeIDDoesNotExist" in str(ex) or "already deleted" in str(ex):
                 return
             logger.exception("Failed to delete volume")
             raise array_errors.ObjectNotFoundError(volume_id)
