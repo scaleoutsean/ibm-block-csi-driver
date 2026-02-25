@@ -134,6 +134,12 @@ Update the Node Agents (DaemonSet)
 kubectl rollout restart daemonset ibm-block-csi-node
 ```
 
+Or just one command that does two things at once.
+
+```sh
+kubectl apply -f ./deploy/santricity-solidfire/csi.ibm.com_v1_ibmblockcsi_cr.yaml
+```
+
 ## Testing
 
 You can use the following YAML to test your installation:
