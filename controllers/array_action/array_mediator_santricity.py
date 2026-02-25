@@ -138,15 +138,15 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
                     nvme_nqns=nqns)
 
     def get_host_by_host_identifiers(self, initiators):
-        for iqn in initiators.iscsi_iqns:
-            host_data = self.client.get_host_by_identifiers(iqn)
-            if host_data:
-                return host_data['label'], [array_settings.ISCSI_CONNECTIVITY_TYPE]
-
         for nqn in initiators.nvme_nqns:
             host_data = self.client.get_host_by_identifiers(nqn)
             if host_data:
                 return host_data['label'], [array_settings.NVME_OVER_ROCE_CONNECTIVITY_TYPE]
+
+        for iqn in initiators.iscsi_iqns:
+            host_data = self.client.get_host_by_identifiers(iqn)
+            if host_data:
+                return host_data['label'], [array_settings.ISCSI_CONNECTIVITY_TYPE]
 
         raise array_errors.HostNotFoundError(str(initiators))
 
