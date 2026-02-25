@@ -72,13 +72,12 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
 
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
                       source_type, is_virt_snap_func, partition_name=None, partition_vg=None):
-        size_gb = size_in_bytes / (1024 ** 3)
         pool_id = self._get_pool_id(pool)
         
         # SANtricity specific: use 'space_efficiency' parameter from StorageClass 
-        # as a hint for RAID level. Defaults to 'raid6' if not specified, 
-        # which is preferred for DDP pools.
-        raid_level = 'raid6'
+        # as a hint for RAID level. Defaults to 'raidAll' (inherit from pool)
+        # because specifying raid6 can fail on non-DDP pools.
+        raid_level = 'raidAll'
         if space_efficiency:
             if space_efficiency.lower() in ['raid1', 'raid5', 'raid6', 'raid10']:
                 raid_level = space_efficiency.lower()
@@ -86,14 +85,15 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
                 raid_level = None
             
         try:
-            vol_data = self.client.create_volume(pool_id, name, size_gb, raid_level=raid_level)
+            # Use label=name in payload for Embedded REST API
+            vol_data = self.client.create_volume(pool_id, name, size_in_bytes, raid_level=raid_level)
             return self._to_volume_object(vol_data)
         except Exception as ex:
-            # If raid6 default fails (e.g. on a traditional RAID5 group), retry with None
-            if raid_level == 'raid6' and not space_efficiency:
-                logger.info("Failed to create volume with raid6 default, retrying with inherited RAID level")
+            # If raidAll fails, fallback to None
+            if raid_level == 'raidAll' and not space_efficiency:
+                logger.info("Failed to create volume with raidAll default, retrying with None")
                 try:
-                    vol_data = self.client.create_volume(pool_id, name, size_gb, raid_level=None)
+                    vol_data = self.client.create_volume(pool_id, name, size_in_bytes, raid_level=None)
                     return self._to_volume_object(vol_data)
                 except Exception:
                     pass
@@ -113,7 +113,8 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         if is_virt_snap_func:
             logger.debug("is_virt_snap_func is not implemented for SANtricity, ignoring")
 
-        vol_data = self.client.get_volume_by_name(name, pool_id=pool)
+        pool_id = self._get_pool_id(pool)
+        vol_data = self.client.get_volume_by_name(name, pool_id=pool_id)
         if not vol_data:
             raise array_errors.ObjectNotFoundError(name)
 
