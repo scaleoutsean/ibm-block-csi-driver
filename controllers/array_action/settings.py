@@ -1,6 +1,7 @@
 from controllers.common.config import config
 
 NVME_OVER_FC_CONNECTIVITY_TYPE = config.connectivity_type.nvme_over_fc
+NVME_OVER_ROCE_CONNECTIVITY_TYPE = config.connectivity_type.nvme_over_roce
 FC_CONNECTIVITY_TYPE = config.connectivity_type.fc
 ISCSI_CONNECTIVITY_TYPE = config.connectivity_type.iscsi
 REPLICATION_COPY_TYPE_SYNC = "sync"

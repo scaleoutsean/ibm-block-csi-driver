@@ -132,7 +132,8 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string) (
 	var lun int
 	var err error
 	connectivityType := publishContext[n.ConfigYaml.Controller.Publish_context_connectivity_parameter]
-	if connectivityType != n.ConfigYaml.Connectivity_type.Nvme_over_fc {
+	if connectivityType != n.ConfigYaml.Connectivity_type.Nvme_over_fc &&
+		connectivityType != n.ConfigYaml.Connectivity_type.Nvme_over_roce {
 		lun, err = strconv.Atoi(strLun)
 		if err != nil {
 			return "", -1, nil, err
@@ -144,13 +145,14 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string) (
 			ipsByArrayInitiator[wwn] = nil
 		}
 	}
-	if connectivityType == n.ConfigYaml.Connectivity_type.Iscsi {
+	if connectivityType == n.ConfigYaml.Connectivity_type.Iscsi ||
+		connectivityType == n.ConfigYaml.Connectivity_type.Nvme_over_roce {
 		iqns := strings.Split(publishContext[n.ConfigYaml.Controller.Publish_context_array_iqn], publishContextSeparator)
 		for _, iqn := range iqns {
 			if ips, iqnExists := publishContext[iqn]; iqnExists {
 				ipsByArrayInitiator[iqn] = strings.Split(ips, publishContextSeparator)
 			} else {
-				logger.Errorf("Publish context does not contain any iscsi target IP for {%v}", iqn)
+				logger.Errorf("Publish context does not contain any target IP for {%v}", iqn)
 			}
 		}
 	}

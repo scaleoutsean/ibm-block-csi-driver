@@ -36,12 +36,14 @@ const (
 type OsDeviceConnectivityNvmeOFc struct {
 	Executer          executer.ExecuterInterface
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
+	Protocol          string
 }
 
-func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityInterface {
+func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, clean_scsi_device bool, protocol string) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityNvmeOFc{
 		Executer:          executer,
 		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, clean_scsi_device),
+		Protocol:          protocol,
 	}
 }
 
@@ -49,6 +51,28 @@ func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, clean_s
 // Connects paths until nvmeTargetPathCount is reached. Logs error if 0 paths result,
 // warning if below target. For non-native NVMe with find_multipaths=on, logs error if < 2 paths.
 func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string][]string) {
+
+	if r.Protocol == "nvmeoroce" {
+		for _, portals := range ipsByArrayInitiator {
+			for _, portal := range portals {
+				logger.Debugf("NVMe/RoCE discover and connect on portal: {%s}", portal)
+				args := []string{"discover", "-t", "roce", "-a", portal}
+				_, err := r.Executer.ExecuteWithTimeout(30000, "nvme", args)
+				if err != nil {
+					logger.Errorf("Failed to discover NVMe/RoCE on portal %s: %v", portal, err)
+					continue
+				}
+
+				// After discovery, connect-all is often used to establish sessions to all discovered controllers
+				args = []string{"connect-all", "-t", "roce", "-a", portal}
+				_, err = r.Executer.ExecuteWithTimeout(30000, "nvme", args)
+				if err != nil {
+					logger.Errorf("Failed to connect-all NVMe/RoCE on portal %s: %v", portal, err)
+				}
+			}
+		}
+		return
+	}
 	if len(ipsByArrayInitiator) == 0 {
 		logger.Warningf("NVMe-oFC EnsureLogin: no array target ports in publish context, skipping")
 		return
