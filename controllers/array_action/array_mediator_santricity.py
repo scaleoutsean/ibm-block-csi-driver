@@ -118,19 +118,37 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         if not host_data:
             raise array_errors.HostNotFoundError(host_name)
 
-        iqns = [p['address'] for p in host_data.get('hostSidePorts', []) if p.get('type') == 'iscsi']
+        connectivity_types = []
+        iqns = []
+        nqns = []
+        for p in host_data.get('hostSidePorts', []):
+            ptype = p.get('type')
+            if ptype == 'iscsi':
+                iqns.append(p['address'])
+                if array_settings.ISCSI_CONNECTIVITY_TYPE not in connectivity_types:
+                    connectivity_types.append(array_settings.ISCSI_CONNECTIVITY_TYPE)
+            elif ptype in ['nvmeof', 'nvmeRoce', 'nvme']:
+                nqns.append(p['address'])
+                if array_settings.NVME_OVER_ROCE_CONNECTIVITY_TYPE not in connectivity_types:
+                    connectivity_types.append(array_settings.NVME_OVER_ROCE_CONNECTIVITY_TYPE)
+
         return Host(name=host_data['label'],
-                    connectivity_types=[array_settings.ISCSI_CONNECTIVITY_TYPE],
-                    iscsi_iqns=iqns)
+                    connectivity_types=connectivity_types,
+                    iscsi_iqns=iqns,
+                    nvme_nqns=nqns)
 
     def get_host_by_host_identifiers(self, initiators):
-        iqns = initiators.iscsi_iqns
-        for iqn in iqns:
+        for iqn in initiators.iscsi_iqns:
             host_data = self.client.get_host_by_identifiers(iqn)
             if host_data:
                 return host_data['label'], [array_settings.ISCSI_CONNECTIVITY_TYPE]
 
-        raise array_errors.HostNotFoundError(str(iqns))
+        for nqn in initiators.nvme_nqns:
+            host_data = self.client.get_host_by_identifiers(nqn)
+            if host_data:
+                return host_data['label'], [array_settings.NVME_OVER_ROCE_CONNECTIVITY_TYPE]
+
+        raise array_errors.HostNotFoundError(str(initiators))
 
     def _get_array_initiators(self, host_name, connectivity_type):
         if connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
@@ -138,6 +156,11 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
             iqn = target_settings.get('nodeName')
             portals = [p.get('address') for p in target_settings.get('portals', [])]
             return {iqn: portals}
+        if connectivity_type == array_settings.NVME_OVER_ROCE_CONNECTIVITY_TYPE:
+            target_settings = self.client.get_nvme_target_settings()
+            nqn = target_settings.get('nodeName')
+            portals = [p.get('address') for p in target_settings.get('portals', [])]
+            return {nqn: portals}
         return {}
 
     def _to_volume_object(self, vol_data):

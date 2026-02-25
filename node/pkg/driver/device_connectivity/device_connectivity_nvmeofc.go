@@ -17,22 +17,47 @@
 package device_connectivity
 
 import (
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 type OsDeviceConnectivityNvmeOFc struct {
 	Executer          executer.ExecuterInterface
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
+	Protocol          string
 }
 
-func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityInterface {
+func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, clean_scsi_device bool, protocol string) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityNvmeOFc{
 		Executer:          executer,
 		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, clean_scsi_device),
+		Protocol:          protocol,
 	}
 }
 
-func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(_ map[string][]string) {
+func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayIdentifier map[string][]string) {
+	if r.Protocol != "nvmeoroce" {
+		return
+	}
+
+	for _, portals := range ipsByArrayIdentifier {
+		for _, portal := range portals {
+			logger.Debugf("NVMe/RoCE discover and connect on portal: {%s}", portal)
+			args := []string{"discover", "-t", "roce", "-a", portal}
+			_, err := r.Executer.ExecuteWithTimeout(30000, "nvme", args)
+			if err != nil {
+				logger.Errorf("Failed to discover NVMe/RoCE on portal %s: %v", portal, err)
+				continue
+			}
+
+			// After discovery, connect-all is often used to establish sessions to all discovered controllers
+			args = []string{"connect-all", "-t", "roce", "-a", portal}
+			_, err = r.Executer.ExecuteWithTimeout(30000, "nvme", args)
+			if err != nil {
+				logger.Errorf("Failed to connect-all NVMe/RoCE on portal %s: %v", portal, err)
+			}
+		}
+	}
 }
 
 func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ int, _ []string) error {

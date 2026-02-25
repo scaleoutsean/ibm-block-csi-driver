@@ -108,4 +108,8 @@ class SANtricityClient:
         """Get iSCSI target settings"""
         return self._client.interfaces.get_iscsi_target_settings()
 
+    def get_nvme_target_settings(self):
+        """Get NVMe target settings"""
+        return self._client.interfaces.get_nvme_target_settings()
+
 

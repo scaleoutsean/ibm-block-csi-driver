@@ -284,7 +284,8 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		}
 	}
 
-	if connectivityType == d.ConfigYaml.Connectivity_type.Iscsi {
+	if connectivityType == d.ConfigYaml.Connectivity_type.Iscsi ||
+		connectivityType == d.ConfigYaml.Connectivity_type.Nvme_over_roce {
 		isAnyIpFound := false
 		for arrayInitiator := range ipsByArrayInitiator {
 			if _, ok := req.PublishContext[arrayInitiator]; ok {
@@ -293,7 +294,7 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 			}
 		}
 		if !isAnyIpFound {
-			return &RequestValidationError{fmt.Sprintf("PublishContext with no iscsi target IP %v.",
+			return &RequestValidationError{fmt.Sprintf("PublishContext with no target IP %v.",
 				req.PublishContext)}
 		}
 	}

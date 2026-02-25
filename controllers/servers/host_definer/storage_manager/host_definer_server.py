@@ -158,7 +158,8 @@ class HostDefinerServicer:
         return connectivity_type in [array_config.FC_CONNECTIVITY_TYPE, array_config.ISCSI_CONNECTIVITY_TYPE]
 
     def _is_protocol_nvme(self, connectivity_type):
-        return connectivity_type == array_config.NVME_OVER_FC_CONNECTIVITY_TYPE
+        return connectivity_type in [array_config.NVME_OVER_FC_CONNECTIVITY_TYPE,
+                                     array_config.NVME_OVER_ROCE_CONNECTIVITY_TYPE]
 
     def _create_host(self, host, array_mediator, request):
         initiators = self._get_initiators_from_node_id(request.node_id_from_csi_node)

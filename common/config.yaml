@@ -26,5 +26,6 @@ parameters:
 
 connectivity_type:
   nvme_over_fc: "nvmeofc"
+  nvme_over_roce: "nvmeoroce"
   fc: "fc"
   iscsi: "iscsi"

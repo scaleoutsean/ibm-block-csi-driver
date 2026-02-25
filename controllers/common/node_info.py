@@ -32,6 +32,7 @@ class Initiators:
         self.iscsi_iqns = self._filter_empty_parts(self.iscsi_iqns)
         self._ports_by_type = {
             array_config.NVME_OVER_FC_CONNECTIVITY_TYPE: self.nvme_nqns,
+            array_config.NVME_OVER_ROCE_CONNECTIVITY_TYPE: self.nvme_nqns,
             array_config.FC_CONNECTIVITY_TYPE: self.fc_wwns,
             array_config.ISCSI_CONNECTIVITY_TYPE: self.iscsi_iqns
         }

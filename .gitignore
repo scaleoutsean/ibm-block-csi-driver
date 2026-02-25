@@ -3,6 +3,7 @@
 .coverage
 .project
 .pydevproject
+.vscode
 /.metadata/
 /bin/
 node/mocks

@@ -617,9 +617,9 @@ def generate_csi_publish_volume_response(lun, connectivity_type, array_initiator
     if connectivity_type == FC_CONNECTIVITY_TYPE:
         array_initiators_param = common_config.controller.publish_context_fc_initiators
         publish_context[array_initiators_param] = separator.join(array_initiators)
-    elif connectivity_type == ISCSI_CONNECTIVITY_TYPE:
-        for iqn, ips in array_initiators.items():
-            publish_context[iqn] = separator.join(ips)
+    elif connectivity_type in [ISCSI_CONNECTIVITY_TYPE, NVME_OVER_ROCE_CONNECTIVITY_TYPE]:
+        for initiator, ips in array_initiators.items():
+            publish_context[initiator] = separator.join(ips)
 
         array_initiators_param = common_config.controller.publish_context_array_iqn
         publish_context[array_initiators_param] = separator.join(array_initiators.keys())
@@ -790,6 +790,7 @@ def get_connectivity_type_ports(initiators, connectivity_type):
 
 def _validate_connectivity_type(connectivity_type):
     if connectivity_type != array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE and \
+            connectivity_type != array_settings.NVME_OVER_ROCE_CONNECTIVITY_TYPE and \
             connectivity_type != array_settings.FC_CONNECTIVITY_TYPE and \
             connectivity_type != array_settings.ISCSI_CONNECTIVITY_TYPE and connectivity_type:
         raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
