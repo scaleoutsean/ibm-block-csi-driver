@@ -3,6 +3,7 @@ import controllers.array_action.settings as array_settings
 from controllers.array_action.array_action_types import Volume, Host
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.santricity_rest_client import SANtricityClient
+from controllers.array_action.utils import ClassProperty
 from controllers.common import settings
 from controllers.common.csi_logger import get_stdout_logger
 
@@ -11,11 +12,41 @@ logger = get_stdout_logger()
 class SANtricityArrayMediator(ArrayMediatorAbstract):
     ARRAY_ACTIONS = {}
 
-    array_type = settings.ARRAY_TYPE_SANTRICITY
-    port = [8443, 8443]
-    max_object_name_length = 30
-    max_object_prefix_length = 20
-    max_connections = 2
+    @ClassProperty
+    def array_type(self):
+        return settings.ARRAY_TYPE_SANTRICITY
+
+    @ClassProperty
+    def port(self):
+        return [8443, 8443]
+
+    @ClassProperty
+    def max_object_name_length(self):
+        return 30
+
+    @ClassProperty
+    def max_object_prefix_length(self):
+        return 20
+
+    @ClassProperty
+    def max_connections(self):
+        return 5
+
+    @ClassProperty
+    def minimal_volume_size_in_bytes(self):
+        return 1024 * 1024  # 1 MiB
+
+    @ClassProperty
+    def maximal_volume_size_in_bytes(self):
+        return 256 * 1024 * 1024 * 1024 * 1024  # 256 TiB
+
+    @ClassProperty
+    def max_lun_retries(self):
+        return 10
+
+    @ClassProperty
+    def default_object_prefix(self):
+        return None
 
     def __init__(self, user, password, endpoint, verify_ssl=False, system_id=None):
         super().__init__(user, password, endpoint, verify_ssl=verify_ssl)

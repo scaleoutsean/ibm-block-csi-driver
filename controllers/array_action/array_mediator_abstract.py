@@ -127,3 +127,46 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
             raise UnsupportedConnectivityTypeError(connectivity_type)
         logger.debug("Returning array initiators: %s", array_initiators)
         return array_initiators
+
+    def register_plugin(self, unique_key, metadata):
+        pass
+
+    @property
+    def identifier(self):
+        return ""
+
+    @property
+    def array_type(self):
+        return ""
+
+    @property
+    def port(self):
+        return 0
+
+    @property
+    def max_object_name_length(self):
+        return 30
+
+    @property
+    def max_object_prefix_length(self):
+        return 0
+
+    @property
+    def max_connections(self):
+        return 2
+
+    @property
+    def minimal_volume_size_in_bytes(self):
+        return 1
+
+    @property
+    def maximal_volume_size_in_bytes(self):
+        return 2**64
+
+    @property
+    def max_lun_retries(self):
+        return 10
+
+    @property
+    def default_object_prefix(self):
+        return None
