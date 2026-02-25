@@ -40,6 +40,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 		This is helper interface for OsDeviceConnectivityHelperScsiGenericInterface.
 		Mainly for writing clean unit testing, so we can Mock this interface in order to unit test logic.
 	*/
+	FlushDeviceBuffers(deviceName string) error
 	RescanDevicesGetHostIds(lunId int, arrayIdentifiers []string) (map[int]bool, error)
 	RescanDevices(lunId int, arrayIdentifiers []string, hostIDs map[int]bool) error
 	GetMpathDevice(volumeId string) (string, error)
@@ -331,7 +332,7 @@ func isSameId(wwn string, volumeIdVariations []string) bool {
 	return false
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(deviceName string) error {
+func (r OsDeviceConnectivityHelperScsiGeneric) FlushDeviceBuffers(deviceName string) error {
 	devicePath := filepath.Join(DevPath, deviceName)
 	_, err := r.Executer.ExecuteWithTimeoutSilently(TimeOutBlockDevCmd, blockDevCmd, []string{flushBufsFlag, devicePath})
 	if err != nil {
@@ -345,7 +346,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(deviceName str
 func (r OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(deviceNames []string) error {
 	logger.Debugf("executing commands : {%v %v} on devices : {%v} and timeout : {%v} mseconds", blockDevCmd, flushBufsFlag, deviceNames, TimeOutBlockDevCmd)
 	for _, deviceName := range deviceNames {
-		err := r.flushDeviceBuffers(deviceName)
+		err := r.FlushDeviceBuffers(deviceName)
 		if err != nil {
 			return err
 		}
@@ -355,7 +356,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(deviceNames [
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice string) error {
-	err := r.flushDeviceBuffers(mpathDevice)
+	err := r.FlushDeviceBuffers(mpathDevice)
 	if err != nil {
 		return err
 	}

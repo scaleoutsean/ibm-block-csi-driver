@@ -182,11 +182,10 @@ There are no quotas or other fancy features. Try [santricity-go](https://github.
 - [EPA](https://github.com/scaleoutsean/eseries-perf-analyzer) - easy setup
 - [ESC](https://github.com/scaleoutsean/eseries-santricity-collector) - hard (for power users)
 
-IBM Block Driver CSI creates (too) unique volume names that aren't supposed to be readable by humans. And that's fine, PVC names are readable but impossible to memorize anyway. This fork attaches metadatta tags to volumes, so if you use ESC mentioned above, you can track them in Grafana. What's injected:
+IBM Block Driver CSI creates (too) unique volume names that aren't supposed to be readable by humans. And that's fine, PVC names are readable but impossible to memorize anyway. This fork attaches metadatta tags to volumes, so if you use ESC mentioned above, you can track them in Grafana. What's injected in SANtricity volume metadata:
 - pvc_name - from csi.storage.k8s.io/pvc/name  
 - pvc_namespace - from csi.storage.k8s.io/pvc/namespace
 - pv_name - from csi.storage.k8s.io/pv/name
-
 
 ## SolidFire Support
 

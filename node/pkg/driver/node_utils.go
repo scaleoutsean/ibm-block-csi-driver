@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -194,10 +195,29 @@ func (n NodeUtils) ClearStageInfoFile(filePath string) error {
 func (n NodeUtils) GetSysDevicesFromMpath(baseDevice string) ([]string, error) {
 	// this will return the 	/sys/block/dm-3/slaves/
 	logger.Debugf("GetSysDevicesFromMpath with param : {%v}", baseDevice)
+
+	// If the device is an NVMe device from /dev/disk/by-id, baseDevice might be the symbolic name.
+	// We should try to resolve it if the /sys/block path doesn't exist.
+	sysBlockPath := path.Join("/sys", "block", baseDevice)
+	if _, err := os.Stat(sysBlockPath); os.IsNotExist(err) && strings.Contains(baseDevice, "nvme") {
+		// Try to find the real device name by looking at /dev/disk/by-id symlinks if possible
+		// or just check if it's an NVMe device by name.
+		logger.Debugf("Base device {%s} not found in /sys/block, checking if it is an NVMe symlink", baseDevice)
+		devPath := path.Join("/dev/disk/by-id", baseDevice)
+		if realPath, err := filepath.EvalSymlinks(devPath); err == nil {
+			baseDevice = path.Base(realPath)
+			logger.Debugf("Resolved symlink {%s} to real device {%s}", devPath, baseDevice)
+		}
+	}
+
 	deviceSlavePath := path.Join("/sys", "block", baseDevice, "slaves")
 	logger.Debugf("looking in path : {%v}", deviceSlavePath)
 	slaves, err := ioutil.ReadDir(deviceSlavePath)
 	if err != nil {
+		if os.IsNotExist(err) && strings.Contains(baseDevice, "nvme") {
+			logger.Debugf("NVMe device {%s} has no slaves directory, this is expected for native NVMe multipathing (ANA)", baseDevice)
+			return []string{}, nil
+		}
 		logger.Errorf("an error occured while looking for device slaves : {%v}", err.Error())
 		return nil, err
 	}
