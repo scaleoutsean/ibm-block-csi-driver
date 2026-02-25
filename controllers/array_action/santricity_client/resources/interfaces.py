@@ -44,21 +44,20 @@ class InterfacesResource(ResourceBase):
                 proto_props = proto_list.get("commandProtocolProperties", []) or []
                 for prop in proto_props:
                     if prop.get("commandProtocol") == "nvme":
-                        nvmeof_props = (
-                            prop.get("nvmeProperties", {}).get("nvmeofProperties", {}) or {}
-                        )
+                        nvme_props = prop.get("nvmeProperties") or {}
+                        nvmeof_props = nvme_props.get("nvmeofProperties") or {}
                         # Could be ibProperties, roceV2Properties etc.
                         for props_key in ["ibProperties", "roceV2Properties"]:
                             addr_data = (
-                                nvmeof_props.get(props_key, {}).get("ipAddressData", {}) or {}
+                                (nvmeof_props.get(props_key) or {}).get("ipAddressData") or {}
                             )
-                            ipv4_data = addr_data.get("ipv4Data", {}) or {}
+                            ipv4_data = addr_data.get("ipv4Data") or {}
                             ip = ipv4_data.get("ipv4Address")
                             if ip and ip != "0.0.0.0":
                                 portals.append(
                                     {
                                         "address": ip,
-                                        "port": nvmeof_props.get(props_key, {}).get(
+                                        "port": (nvmeof_props.get(props_key) or {}).get(
                                             "listeningPort", 4420
                                         ),
                                     }

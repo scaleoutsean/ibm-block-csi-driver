@@ -234,11 +234,15 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
             target_settings = self.client.get_iscsi_target_settings()
             iqn = target_settings.get('nodeName')
             portals = [p.get('address') for p in target_settings.get('portals', [])]
+            if not iqn:
+                return {}
             return {iqn: portals}
         if connectivity_type == array_settings.NVME_OVER_ROCE_CONNECTIVITY_TYPE:
             target_settings = self.client.get_nvme_target_settings()
             nqn = target_settings.get('nodeName')
             portals = [p.get('address') for p in target_settings.get('portals', [])]
+            if not nqn:
+                return {}
             return {nqn: portals}
         return {}
 
@@ -422,12 +426,14 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
     def get_volume_mappings(self, volume_id):
         mappings = {}
         all_mappings = self.client.list_volume_mappings()
-        # Use .get('id') or .get('hostRef') to match either flavor of REST API
+        # Use id or hostRef to match either flavor of REST API
         # Need to collect labels from both individual hosts and host groups (clusters)
-        all_targets = {h.get('id', h.get('hostRef')): h['label'] for h in self.client.list_hosts()}
+        all_targets = {(h.get('id') or h.get('hostRef')): h['label'] for h in self.client.list_hosts()
+                       if h.get('id') or h.get('hostRef')}
         try:
-            all_targets.update({g.get('id', g.get('clusterRef')): g['label'] 
-                               for g in self.client.list_host_groups()})
+            all_targets.update({(g.get('id') or g.get('clusterRef')): g['label'] 
+                               for g in self.client.list_host_groups()
+                               if g.get('id') or g.get('clusterRef')})
         except Exception:
             pass # Some API versions might only have /hosts or lack /host-groups
         
