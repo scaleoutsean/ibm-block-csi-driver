@@ -13,7 +13,7 @@ import controllers.array_action.settings as array_settings
 import controllers.servers.messages as messages
 import controllers.servers.settings as servers_settings
 from controllers.array_action.array_action_types import ReplicationRequest
-from controllers.array_action.settings import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
+from controllers.array_action.settings import NVME_OVER_FC_CONNECTIVITY_TYPE, NVME_OVER_ROCE_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
     ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC, REPLICATION_TYPE_MIRROR, \
     REPLICATION_TYPE_EAR, REPLICATION_DEFAULT_COPY_TYPE
 from controllers.common import settings
@@ -592,6 +592,9 @@ def get_object_id_info(full_object_id, object_type):
 
 def choose_connectivity_type(connectivity_types):
     logger.debug("choosing connectivity type for connectivity types : {0}".format(connectivity_types))
+    if NVME_OVER_ROCE_CONNECTIVITY_TYPE in connectivity_types:
+        logger.debug("connectivity type is : {0}".format(NVME_OVER_ROCE_CONNECTIVITY_TYPE))
+        return NVME_OVER_ROCE_CONNECTIVITY_TYPE
     if NVME_OVER_FC_CONNECTIVITY_TYPE in connectivity_types:
         logger.debug("connectivity type is : {0}".format(NVME_OVER_FC_CONNECTIVITY_TYPE))
         return NVME_OVER_FC_CONNECTIVITY_TYPE
