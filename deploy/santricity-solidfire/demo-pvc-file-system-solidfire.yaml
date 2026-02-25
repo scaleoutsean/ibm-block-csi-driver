@@ -1,0 +1,12 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: demo-pvc-file-system-solidfire
+spec:
+  volumeMode: Filesystem  # Optional. The default is Filesystem.
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: demo-storageclass-solidfire

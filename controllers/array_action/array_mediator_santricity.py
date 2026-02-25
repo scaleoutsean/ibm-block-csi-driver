@@ -37,10 +37,30 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
                       source_type, is_virt_snap_func, partition_name=None, partition_vg=None):
         size_gb = size_in_bytes / (1024 ** 3)
+        
+        # SANtricity specific: use 'space_efficiency' parameter from StorageClass 
+        # as a hint for RAID level. Defaults to 'raid6' if not specified, 
+        # which is preferred for DDP pools.
+        raid_level = 'raid6'
+        if space_efficiency:
+            if space_efficiency.lower() in ['raid1', 'raid5', 'raid6', 'raid10']:
+                raid_level = space_efficiency.lower()
+            elif space_efficiency.lower() == 'none':
+                raid_level = None
+            
         try:
-            vol_data = self.client.create_volume(pool, name, size_gb)
+            vol_data = self.client.create_volume(pool, name, size_gb, raid_level=raid_level)
             return self._to_volume_object(vol_data)
         except Exception as ex:
+            # If raid6 default fails (e.g. on a traditional RAID5 group), retry with None
+            if raid_level == 'raid6' and not space_efficiency:
+                logger.info("Failed to create volume with raid6 default, retrying with inherited RAID level")
+                try:
+                    vol_data = self.client.create_volume(pool, name, size_gb, raid_level=None)
+                    return self._to_volume_object(vol_data)
+                except Exception:
+                    pass
+            
             logger.exception("Failed to create volume")
             raise array_errors.VolumeCreationError(name)
 
@@ -59,16 +79,18 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         except Exception:
             raise array_errors.ObjectNotFoundError(volume_id)
 
-    def map_volume(self, volume_id, host_name, connectivity_type):
-        # First check if host exists, if not create it? 
-        # The abstract class seems to handle host creation/lookup via get_host_by_host_identifiers
-        # But map_volume just takes host_name.
-        
-        # We need to find the host ID for the name
-        host_id = self._get_host_id_by_name(host_name)
-        if not host_id:
-             raise array_errors.HostNotFoundError(host_name)
+    def expand_volume(self, volume_id, required_bytes, partition_name=None):
+        try:
+            self.client.expand_volume(volume_id, required_bytes)
+        except Exception as ex:
+            raise array_errors.ExpandVolumeError(volume_id, ex)
 
+    def map_volume(self, volume_id, host_name, connectivity_type):
+        host_data = self.client.get_host_by_identifiers(host_name)
+        if not host_data:
+            raise array_errors.HostNotFoundError(host_name)
+
+        host_id = host_data['id']
         try:
             mapping = self.client.create_volume_mapping(volume_id, host_id)
             return str(mapping['lun'])
@@ -76,37 +98,47 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
             raise array_errors.MappingError(volume_id, host_name, ex)
 
     def unmap_volume(self, volume_id, host_name):
-        # We need to find the mapping ID.
-        # This is inefficient, we should probably add a method to client to find mapping by vol/host
+        host_data = self.client.get_host_by_identifiers(host_name)
+        if not host_data:
+            logger.info("Host {} not found, assuming unmapped".format(host_name))
+            return
+
+        host_id = host_data['id']
         mappings = self.client.list_volume_mappings()
-        host_id = self._get_host_id_by_name(host_name)
         
         for m in mappings:
             if m['mappableObjectId'] == volume_id and m['targetId'] == host_id:
                 self.client.delete_volume_mapping(m['mappingRef'])
                 return
         
-        # If not found, maybe already unmapped?
         logger.info("Mapping not found for volume {} and host {}".format(volume_id, host_name))
 
     def get_host_by_name(self, host_name):
-        host_id = self._get_host_id_by_name(host_name)
-        if not host_id:
+        host_data = self.client.get_host_by_identifiers(host_name)
+        if not host_data:
             raise array_errors.HostNotFoundError(host_name)
-        
-        # We need to get details to populate connectivity types
-        # For now, assuming iSCSI
-        return Host(name=host_name, connectivity_types=[array_settings.ISCSI_CONNECTIVITY_TYPE], iscsi_iqns=[])
+
+        iqns = [p['address'] for p in host_data.get('hostSidePorts', []) if p.get('type') == 'iscsi']
+        return Host(name=host_data['label'],
+                    connectivity_types=[array_settings.ISCSI_CONNECTIVITY_TYPE],
+                    iscsi_iqns=iqns)
 
     def get_host_by_host_identifiers(self, initiators):
-        # Search hosts by initiators (IQNs)
-        # This requires listing hosts and checking their ports
-        # For MVP, we might assume host name matches or something, but better to implement search
-        raise NotImplementedError("Host lookup by initiators not implemented yet")
+        iqns = initiators.iscsi_iqns
+        for iqn in iqns:
+            host_data = self.client.get_host_by_identifiers(iqn)
+            if host_data:
+                return host_data['label'], [array_settings.ISCSI_CONNECTIVITY_TYPE]
+
+        raise array_errors.HostNotFoundError(str(iqns))
 
     def _get_array_initiators(self, host_name, connectivity_type):
-        # Return list of iSCSI portal IPs/IQNs
-        return ["1.1.1.1"] # Placeholder
+        if connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
+            target_settings = self.client.get_iscsi_target_settings()
+            iqn = target_settings.get('nodeName')
+            portals = [p.get('address') for p in target_settings.get('portals', [])]
+            return {iqn: portals}
+        return {}
 
     def _to_volume_object(self, vol_data):
         return Volume(
@@ -120,12 +152,13 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
             pool=vol_data['poolId']
         )
 
-    def _get_host_id_by_name(self, host_name):
-        hosts = self.client.list_hosts()
-        for h in hosts:
-            if h['name'] == host_name:
-                return h['id']
-        return None
-
     def copy_to_existing_volume(self, volume_id, source_id, source_capacity_in_bytes, minimum_volume_size_in_bytes):
         raise NotImplementedError()
+
+    def get_iscsi_targets_by_iqn(self, host_name):
+        target_settings = self.client.get_iscsi_target_settings()
+        iqn = target_settings.get('nodeName')
+        portals = [p.get('address') for p in target_settings.get('portals', [])]
+        if not iqn or not portals:
+            raise array_errors.NoIscsiTargetsFoundError(self.endpoint)
+        return {iqn: portals}

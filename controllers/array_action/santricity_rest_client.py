@@ -1,6 +1,7 @@
-import requests
 import urllib3
 from controllers.common.csi_logger import get_stdout_logger
+from .santricity_client.client import SANtricityClient as NewSANtricityClient
+from .santricity_client.auth.basic import BasicAuth
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -8,36 +9,21 @@ logger = get_stdout_logger()
 
 class SANtricityClient:
     """
-    Client for interacting with NetApp SANtricity Web Services Proxy or Embedded Web Services.
+    Wrapper for the NetApp SANtricity Python Client Library.
     """
     def __init__(self, address, user, password, port=8443, verify_ssl=False):
-        self.base_url = "https://{}:{}/devmgr/v2".format(address, port)
-        self.session = requests.Session()
-        self.session.auth = (user, password)
-        self.session.verify = verify_ssl
-        self.session.headers.update({
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        })
-
-    def _request(self, method, endpoint, data=None, params=None):
-        url = "{}/{}".format(self.base_url, endpoint)
-        logger.debug("Sending {} request to {}".format(method, url))
-        try:
-            response = self.session.request(method, url, json=data, params=params)
-            response.raise_for_status()
-            if response.content:
-                return response.json()
-            return None
-        except requests.exceptions.HTTPError as e:
-            logger.error("HTTP Error: {} - {}".format(e, e.response.text))
-            raise
-        except Exception as e:
-            logger.error("Request Error: {}".format(e))
-            raise
+        base_url = "https://{}:{}/devmgr/v2".format(address, port)
+        auth = BasicAuth(username=user, password=password)
+        self._client = NewSANtricityClient(
+            base_url=base_url,
+            auth_strategy=auth,
+            verify_ssl=verify_ssl
+        )
+        # Default to system '1' if not specified, matching previous behavior
+        self.system_id = "1"
 
     def get_storage_systems(self):
-        return self._request("GET", "storage-systems")
+        return self._client.system.list()
 
     def create_volume(self, pool_id, name, size_gb, raid_level=None, workload_id=None):
         """
@@ -48,38 +34,35 @@ class SANtricityClient:
                 name, size_gb, pool_id, raid_level, workload_id
             )
         )
-        
-        request_body = {
+        payload = {
             "poolId": pool_id,
             "name": name,
             "sizeUnit": "gb",
             "size": str(size_gb),
         }
-        
         if raid_level:
-            request_body["raidLevel"] = raid_level
-        
+            payload["raidLevel"] = raid_level
         if workload_id:
-            request_body["workloadId"] = workload_id
-        
-        endpoint = "storage-systems/1/volumes"
-        return self._request("POST", endpoint, data=request_body)
+            payload["workloadId"] = workload_id
+            
+        return self._client.volumes.create(payload)
 
     def delete_volume(self, volume_id):
         """Delete a volume"""
         logger.info("Deleting volume: {}".format(volume_id))
-        endpoint = "storage-systems/1/volumes/{}".format(volume_id)
-        self._request("DELETE", endpoint)
+        return self._client.volumes.delete(volume_id)
 
     def get_volume(self, volume_id):
         """Get specific volume details"""
-        endpoint = "storage-systems/1/volumes/{}".format(volume_id)
-        return self._request("GET", endpoint)
+        return self._client.volumes.get(volume_id)
+
+    def expand_volume(self, volume_id, size_bytes):
+        """Expand volume capacity"""
+        return self._client.volumes.expand(volume_id, size_bytes)
 
     def list_volumes(self):
         """List all volumes"""
-        endpoint = "storage-systems/1/volumes"
-        return self._request("GET", endpoint)
+        return self._client.volumes.list()
 
     def create_volume_mapping(self, volume_id, target_id, lun=None):
         """
@@ -90,36 +73,39 @@ class SANtricityClient:
                 volume_id, target_id, lun
             )
         )
-        
-        request_body = {
-            "mappableObjectId": volume_id,
-            "targetId": target_id
-        }
-        
-        if lun is not None:
-            request_body["lun"] = lun
-        
-        endpoint = "storage-systems/1/volume-mappings"
-        return self._request("POST", endpoint, data=request_body)
+        return self._client.mappings.map_volume(
+            volume_ref=volume_id,
+            host_ref=target_id,
+            lun=lun
+        )
 
     def delete_volume_mapping(self, mapping_id):
         """Delete a volume mapping"""
         logger.info("Deleting volume mapping: {}".format(mapping_id))
-        endpoint = "storage-systems/1/volume-mappings/{}".format(mapping_id)
-        self._request("DELETE", endpoint)
+        return self._client.request("DELETE", f"/volume-mappings/{mapping_id}")
 
     def list_volume_mappings(self):
         """List all volume mappings"""
-        endpoint = "storage-systems/1/volume-mappings"
-        return self._request("GET", endpoint)
+        return self._client.mappings.list()
 
     def list_hosts(self):
         """List all registered hosts"""
-        endpoint = "storage-systems/1/hosts"
-        return self._request("GET", endpoint)
+        return self._client.hosts.list()
 
     def get_host(self, host_id):
         """Get specific host details"""
-        endpoint = "storage-systems/1/hosts/{}".format(host_id)
-        return self._request("GET", endpoint)
+        return self._client.hosts.get(host_id)
+
+    def get_host_by_identifiers(self, identifier):
+        """Find a host by name, ID, or port address"""
+        return self._client.hosts.get_by_identifiers(identifier)
+
+    def get_pools(self):
+        """List storage pools"""
+        return self._client.pools.list()
+
+    def get_iscsi_target_settings(self):
+        """Get iSCSI target settings"""
+        return self._client.interfaces.get_iscsi_target_settings()
+
 
