@@ -12,6 +12,7 @@ class ArrayConnectionInfo:
     partition_name: str = None
     partition_vg: str = None
     port_set: str = None
+    verify_ssl: bool = False
 
 
 @dataclass

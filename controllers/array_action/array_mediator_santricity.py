@@ -3,7 +3,6 @@ import controllers.array_action.settings as array_settings
 from controllers.array_action.array_action_types import Volume, Host
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.santricity_rest_client import SANtricityClient
-from controllers.array_action.utils import ClassProperty
 from controllers.common import settings
 from controllers.common.csi_logger import get_stdout_logger
 
@@ -12,18 +11,16 @@ logger = get_stdout_logger()
 class SANtricityArrayMediator(ArrayMediatorAbstract):
     ARRAY_ACTIONS = {}
 
-    @ClassProperty
-    def array_type(self):
-        return settings.ARRAY_TYPE_SANTRICITY
+    array_type = settings.ARRAY_TYPE_SANTRICITY
+    port = [8443, 8443]
+    max_object_name_length = 30
+    max_object_prefix_length = 20
+    max_connections = 2
 
-    @ClassProperty
-    def port(self):
-        return 8443
-
-    def __init__(self, user, password, endpoint):
-        super().__init__(user, password, endpoint)
-        self.client = SANtricityClient(endpoint, user, password)
-        self._identifier = None
+    def __init__(self, user, password, endpoint, verify_ssl=False, system_id=None):
+        super().__init__(user, password, endpoint, verify_ssl=verify_ssl)
+        self.client = SANtricityClient(endpoint, user, password, verify_ssl=verify_ssl, system_id=system_id)
+        self._identifier = system_id
 
     def disconnect(self):
         pass
@@ -31,7 +28,7 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
     @property
     def identifier(self):
         if not self._identifier:
-            self._identifier = self.client.get_storage_systems()[0]['id']
+            self._identifier = self.client.system_id
         return self._identifier
 
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
@@ -72,12 +69,15 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
             logger.exception("Failed to delete volume")
             raise array_errors.ObjectNotFoundError(volume_id)
 
-    def get_volume(self, volume_id):
-        try:
-            vol_data = self.client.get_volume(volume_id)
-            return self._to_volume_object(vol_data)
-        except Exception:
-            raise array_errors.ObjectNotFoundError(volume_id)
+    def get_volume(self, name, pool, is_virt_snap_func):
+        if is_virt_snap_func:
+            logger.debug("is_virt_snap_func is not implemented for SANtricity, ignoring")
+
+        vol_data = self.client.get_volume_by_name(name, pool_id=pool)
+        if not vol_data:
+            raise array_errors.ObjectNotFoundError(name)
+
+        return self._to_volume_object(vol_data)
 
     def expand_volume(self, volume_id, required_bytes, partition_name=None):
         try:

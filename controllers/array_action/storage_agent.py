@@ -53,12 +53,15 @@ def detect_array_type(endpoints):
     if storage_type:
         return storage_type
 
-    for storage_type, port in array_type_to_port.items():
-        for endpoint in endpoints:
-            if _socket_connect_test(endpoint, port) == 0:
-                logger.debug("storage array type is : {0}".format(storage_type))
-                array_type_cache[endpoint] = storage_type
-                return storage_type
+    for storage_type, ports in array_type_to_port.items():
+        if not isinstance(ports, list):
+            ports = [ports]
+        for port in ports:
+            for endpoint in endpoints:
+                if _socket_connect_test(endpoint, port) == 0:
+                    logger.debug("storage array type is : {0}".format(storage_type))
+                    array_type_cache[endpoint] = storage_type
+                    return storage_type
 
     raise FailedToFindStorageSystemType(endpoints)
 
@@ -93,9 +96,11 @@ def get_agent(array_connection_info, array_type=None):
     endpoints = array_connection_info.array_addresses
     username = array_connection_info.user
     password = array_connection_info.password
+    verify_ssl = array_connection_info.verify_ssl
+    system_id = array_connection_info.system_id
     endpoint_key = settings.ENDPOINTS_SEPARATOR.join(endpoints)
     with lock:
-        found = _array_agents.get((username, endpoint_key), None)
+        found = _array_agents.get((username, endpoint_key, system_id), None)
         if found:
             # delete the agent and clear all the connections if password is changed.
             if found.password != password:
@@ -103,15 +108,15 @@ def get_agent(array_connection_info, array_type=None):
                     "The password is changed for endpoint {}, "
                     "remove the cached connection".format(endpoint_key)
                 )
-                del _array_agents[(username, endpoint_key)]
+                del _array_agents[(username, endpoint_key, system_id)]
                 del found
             else:
                 logger.debug("Found a cached agent for endpoint {}, reuse it".format(endpoint_key))
                 return found
 
         logger.debug("Creating a new agent for endpoint {}".format(endpoint_key))
-        agent = StorageAgent(endpoints, username, password, array_type)
-        _array_agents[(username, endpoint_key)] = agent
+        agent = StorageAgent(endpoints, username, password, array_type, verify_ssl=verify_ssl, system_id=system_id)
+        _array_agents[(username, endpoint_key, system_id)] = agent
         return agent
 
 
@@ -137,10 +142,12 @@ class StorageAgent:
     StorageAgent is an agent which caches several mediators of the same storage for reuse cross threads.
     """
 
-    def __init__(self, endpoints, username, password, array_type=None):
+    def __init__(self, endpoints, username, password, array_type=None, verify_ssl=False, system_id=None):
         self.username = username
         self.password = password
         self.endpoints = endpoints
+        self.verify_ssl = verify_ssl
+        self.system_id = system_id
         self.endpoint_key = settings.ENDPOINTS_SEPARATOR.join(endpoints)
         self.conn_pool = None
 
@@ -154,9 +161,10 @@ class StorageAgent:
             username=self.username,
             password=self.password,
             med_class=med_class,
-            # Specifying a non-zero min_size pre-populates the pool with min_size items
             min_size=1,
-            max_size=min(med_class.max_connections, settings.CSI_CONTROLLER_SERVER_WORKERS)
+            max_size=min(med_class.max_connections, settings.CSI_CONTROLLER_SERVER_WORKERS),
+            verify_ssl=self.verify_ssl,
+            system_id=self.system_id
         )
 
     def __del__(self):

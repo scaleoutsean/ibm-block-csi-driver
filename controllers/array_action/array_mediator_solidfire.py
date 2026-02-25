@@ -107,10 +107,10 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
     def default_object_prefix(self):
         return "CSI"
 
-    def __init__(self, user, password, endpoint):
-        super().__init__(user, password, endpoint)
+    def __init__(self, user, password, endpoint, verify_ssl=False):
+        super().__init__(user, password, endpoint, verify_ssl=verify_ssl)
         # Endpoint is the MVIP
-        self.client = SolidFireClient(endpoint[0], user, password)
+        self.client = SolidFireClient(endpoint[0], user, password, verify_ssl=verify_ssl)
         self._identifier = None
 
     def disconnect(self):

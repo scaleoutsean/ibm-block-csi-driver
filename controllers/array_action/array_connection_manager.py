@@ -43,7 +43,7 @@ def _socket_connect_test(host, port, timeout=1):
 
 class ArrayConnectionManager:
 
-    def __init__(self, user, password, endpoint, array_type=None):  # TODO return the params back.
+    def __init__(self, user, password, endpoint, array_type=None, verify_ssl=False):  # TODO return the params back.
         self.array_mediator_class_dict = {
             XIVArrayMediator.array_type: XIVArrayMediator,
             SVCArrayMediator.array_type: SVCArrayMediator,
@@ -57,6 +57,7 @@ class ArrayConnectionManager:
         self.password = password
         self.endpoints = endpoint
         self.endpoint_key = ",".join(self.endpoints)
+        self.verify_ssl = verify_ssl
 
         if self.array_type is None:
             self.array_type = self.detect_array_type()
@@ -103,6 +104,9 @@ class ArrayConnectionManager:
 
             logger.debug("got connection lock. array connection dict is: {}".format(array_connections_dict))
             try:
+                self.med_class = med_class(self.user, self.password, self.endpoints, verify_ssl=self.verify_ssl)
+            except TypeError:
+                # Fallback for mediators that don't support verify_ssl yet
                 self.med_class = med_class(self.user, self.password, self.endpoints)
             except Exception as ex:
                 if array_connections_dict[self.endpoint_key] == 1:
@@ -120,16 +124,19 @@ class ArrayConnectionManager:
         logger.debug("detecting array connection type")
 
         # Don't change the order here since svc port (22) is also opened in ds8k.
-        for storage_type, port in [(XIVArrayMediator.array_type, XIVArrayMediator.port),
-                                   (DS8KArrayMediator.array_type, DS8KArrayMediator.port),
-                                   (SVCArrayMediator.array_type, SVCArrayMediator.port),
-                                   (SANtricityArrayMediator.array_type, SANtricityArrayMediator.port),
-                                   (SolidFireArrayMediator.array_type, SolidFireArrayMediator.port),
-                                   ]:
+        for storage_type, ports in [(XIVArrayMediator.array_type, XIVArrayMediator.port),
+                                    (DS8KArrayMediator.array_type, DS8KArrayMediator.port),
+                                    (SVCArrayMediator.array_type, SVCArrayMediator.port),
+                                    (SANtricityArrayMediator.array_type, SANtricityArrayMediator.port),
+                                    (SolidFireArrayMediator.array_type, SolidFireArrayMediator.port),
+                                    ]:
 
-            for endpoint in self.endpoints:
-                if _socket_connect_test(endpoint, port) == 0:
-                    logger.debug("storage array type is : {0}".format(storage_type))
-                    return storage_type
+            if not isinstance(ports, list):
+                ports = [ports]
+            for port in ports:
+                for endpoint in self.endpoints:
+                    if _socket_connect_test(endpoint, port) == 0:
+                        logger.debug("storage array type is : {0}".format(storage_type))
+                        return storage_type
 
         raise FailedToFindStorageSystemType(self.endpoints)

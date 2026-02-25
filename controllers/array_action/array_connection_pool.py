@@ -9,11 +9,13 @@ logger = get_stdout_logger()
 class ConnectionPool:
     """A simple pool to hold connections."""
 
-    def __init__(self, endpoints, username, password, med_class, min_size, max_size):
+    def __init__(self, endpoints, username, password, med_class, min_size, max_size, verify_ssl=False, system_id=None):
         self.endpoints = endpoints
         self.username = username
         self.password = password
         self.med_class = med_class
+        self.verify_ssl = verify_ssl
+        self.system_id = system_id
         self.endpoint_key = settings.ENDPOINTS_SEPARATOR.join(endpoints)
 
         self.current_size = 0
@@ -34,7 +36,15 @@ class ConnectionPool:
 
     def create(self):
         logger.debug("Creating a new connection for endpoint {}".format(self.endpoint_key))
-        return self.med_class(self.username, self.password, self.endpoints)
+        try:
+            return self.med_class(self.username, self.password, self.endpoints, 
+                                 verify_ssl=self.verify_ssl, system_id=self.system_id)
+        except TypeError:
+            # Fallback for mediators that don't support verify_ssl or system_id yet
+            try:
+                return self.med_class(self.username, self.password, self.endpoints, verify_ssl=self.verify_ssl)
+            except TypeError:
+                return self.med_class(self.username, self.password, self.endpoints)
 
     def get(self, block=True, timeout=None):
         """
