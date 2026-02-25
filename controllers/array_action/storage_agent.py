@@ -20,11 +20,11 @@ _array_agents = {}
 lock = RLock()
 
 array_type_to_port = OrderedDict()
+array_type_to_port[SANtricityArrayMediator.array_type] = SANtricityArrayMediator.port
 array_type_to_port[XIVArrayMediator.array_type] = XIVArrayMediator.port
 array_type_to_port[DS8KArrayMediator.array_type] = DS8KArrayMediator.port
-array_type_to_port[SVCArrayMediator.array_type] = SVCArrayMediator.port
-array_type_to_port[SANtricityArrayMediator.array_type] = SANtricityArrayMediator.port
 array_type_to_port[SolidFireArrayMediator.array_type] = SolidFireArrayMediator.port
+array_type_to_port[SVCArrayMediator.array_type] = SVCArrayMediator.port
 
 array_type_to_mediator = {
     XIVArrayMediator.array_type: XIVArrayMediator,

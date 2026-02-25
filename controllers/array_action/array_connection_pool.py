@@ -1,3 +1,4 @@
+import inspect
 from queue import Queue, Full, Empty
 from threading import RLock
 from controllers.common.csi_logger import get_stdout_logger
@@ -36,15 +37,18 @@ class ConnectionPool:
 
     def create(self):
         logger.debug("Creating a new connection for endpoint {}".format(self.endpoint_key))
-        try:
-            return self.med_class(self.username, self.password, self.endpoints, 
-                                 verify_ssl=self.verify_ssl, system_id=self.system_id)
-        except TypeError:
-            # Fallback for mediators that don't support verify_ssl or system_id yet
-            try:
-                return self.med_class(self.username, self.password, self.endpoints, verify_ssl=self.verify_ssl)
-            except TypeError:
-                return self.med_class(self.username, self.password, self.endpoints)
+        
+        # Determine the signature of the __init__ to only pass what's supported
+        sig = inspect.signature(self.med_class)
+        params = sig.parameters
+        
+        kwargs = {}
+        if 'verify_ssl' in params:
+            kwargs['verify_ssl'] = self.verify_ssl
+        if 'system_id' in params:
+            kwargs['system_id'] = self.system_id
+            
+        return self.med_class(self.username, self.password, self.endpoints, **kwargs)
 
     def get(self, block=True, timeout=None):
         """

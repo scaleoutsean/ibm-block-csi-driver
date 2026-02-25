@@ -2,7 +2,7 @@ identity:
   name: santricity.block.csi.ibm.com
   version: 1.13.0
   capabilities:
-    Service: [ CONTROLLER_SERVICE, VOLUME_ACCESSIBILITY_CONSTRAINTS ]
+    Service: [ CONTROLLER_SERVICE ]
     VolumeExpansion: ONLINE
 
 controller:

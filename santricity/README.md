@@ -4,6 +4,35 @@ This directory contains documentation and sample configurations for using the IB
 
 **WARNING:** this CSI driver uses a minimally changed `CSIDriver` object name in `./common/config.yaml` to avoid conflict with upstream CSI driver name (if installed in the same Kuberntes cluster) and at the same time credit upstream auhors. This fork is **not associated with, or suppored by, IBM**.
 
+## Capabilities
+
+### CSI RPC Capabilities
+
+These are the capabilities the driver explicitly reports to Kubernetes during the CSI GetCapabilities calls.
+
+- Controller Capabilities: Reported in `csi_controller_server.py`
+  - CREATE_DELETE_VOLUME (Dynamic Provisioning)
+  - CREATE_DELETE_SNAPSHOT (Snapshots)
+  - PUBLISH_UNPUBLISH_VOLUME (Attach/Detach)
+  - CLONE_VOLUME (Volume Cloning)
+  - EXPAND_VOLUME (Offline/Online Resizing)
+- Node Capabilities: Hardcoded in node.go:37.
+  - STAGE_UNSTAGE_VOLUME (Mount/Unmount)
+  - EXPAND_VOLUME (Node-side resizing)
+  - GET_VOLUME_STATS (Volume metrics)
+- Access Modes (RWO/RWX): Defined in node.go:46.
+  - SINGLE_NODE_WRITER (RWO)
+  - MULTI_NODE_MULTI_WRITER (RWX)
+- Driver Identity & Plug-in Capabilities
+  - The driver's global identity and high-level service capabilities are defined in the central configuration file:
+    - CONTROLLER_SERVICE
+    - VolumeExpansion: ONLINE
+- Supported Connectivity Protocols
+The protocols supported by the driver (iSCSI, FC, NVMe) are defined in the configuration and implemented via the storage mediators:
+- Connectivity protocols - iscsi, fc, nvme_over_fc, and our new nvme_over_roce
+
+If you use this driver, desire additional features already implemented in upstream driver and can assist with debugging (or development), create a feature request in Issues or ping me on X.
+
 ## Build Instructions
 
 To build the driver with SANtricity support, you must vendor the `santricity-client` library. A helper target has been added to the main `Makefile`.
