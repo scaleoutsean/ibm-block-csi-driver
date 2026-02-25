@@ -31,7 +31,7 @@ class ArrayMediator(ABC):
 
     @abstractmethod
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
-                      source_type, is_virt_snap_func, partition_name=None, partition_vg=None):
+                      source_type, is_virt_snap_func, partition_name=None, partition_vg=None, extra_parameters=None):
         """
         This function should create a volume in the storage system.
 
@@ -45,6 +45,7 @@ class ArrayMediator(ABC):
             source_ids        : ObjectIds of source to create from
             source_type       : volume or snapshot
             is_virt_snap_func : indicate if svc's snapshot function feature is enabled
+            extra_parameters  : raw storage class parameters for metadata extraction
 
         Returns:
             volume_id : the volume WWN.

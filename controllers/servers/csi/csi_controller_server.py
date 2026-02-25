@@ -114,7 +114,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                           volume_parameters.io_group, volume_parameters.volume_group,
                                                           source_ids, source_type, use_snap_object,
                                                           array_connection_info.partition_name,
-                                                          array_connection_info.partition_vg)
+                                                          array_connection_info.partition_vg,
+                                                          extra_parameters=request.parameters)
                 else:
                     logger.debug("volume found : {}".format(volume))
 
