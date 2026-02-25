@@ -121,7 +121,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		}
 	}
 
-	connectivityType, lun, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext)
+	connectivityType, lun, arraySerial, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -159,7 +159,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volumeUuid)
+	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volumeUuid, lun, arraySerial)
 	logger.Debugf("Discovered device : {%v}", mpathDevice)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
@@ -264,7 +264,7 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{"Volume Access Type is not supported"}
 	}
 
-	connectivityType, lun, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext)
+	connectivityType, lun, _, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext)
 	if err != nil {
 		return &RequestValidationError{fmt.Sprintf("Fail to parse PublishContext %v with err = %v", req.PublishContext, err)}
 	}

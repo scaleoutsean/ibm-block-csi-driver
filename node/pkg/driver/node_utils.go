@@ -69,7 +69,7 @@ type NodeUtilsInterface interface {
 	DevicesAreNvme(sysDevices []string) (bool, error)
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
-	GetInfoFromPublishContext(publishContext map[string]string) (string, int, map[string][]string, error)
+	GetInfoFromPublishContext(publishContext map[string]string) (string, int, string, map[string][]string, error)
 	GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string
 	GetSysDevicesFromMpath(baseDevice string) ([]string, error)
 
@@ -112,21 +112,21 @@ func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface, 
 	}
 }
 
-func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string) (string, int, map[string][]string, error) {
-	// this will return :  connectivityType, lun, ipsByArrayInitiator, error
+func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string) (string, int, string, map[string][]string, error) {
+	// this will return :  connectivityType, lun, arraySerial, ipsByArrayInitiator, error
 	ipsByArrayInitiator := make(map[string][]string)
 	strLun := publishContext[n.ConfigYaml.Controller.Publish_context_lun_parameter]
+	arraySerial := publishContext[n.ConfigYaml.Controller.Publish_context_array_serial]
 	publishContextSeparator := n.ConfigYaml.Controller.Publish_context_separator
 	var lun int
 	var err error
-	connectivityType := publishContext[n.ConfigYaml.Controller.Publish_context_connectivity_parameter]
-	if connectivityType != n.ConfigYaml.Connectivity_type.Nvme_over_fc &&
-		connectivityType != n.ConfigYaml.Connectivity_type.Nvme_over_roce {
+	if strLun != "" {
 		lun, err = strconv.Atoi(strLun)
 		if err != nil {
-			return "", -1, nil, err
+			return "", -1, "", nil, err
 		}
 	}
+	connectivityType := publishContext[n.ConfigYaml.Controller.Publish_context_connectivity_parameter]
 	if connectivityType == n.ConfigYaml.Connectivity_type.Fc {
 		wwns := strings.Split(publishContext[n.ConfigYaml.Controller.Publish_context_fc_initiators], publishContextSeparator)
 		for _, wwn := range wwns {
@@ -145,9 +145,9 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string) (
 		}
 	}
 
-	logger.Debugf("PublishContext relevant info : connectivityType=%v, lun=%v, arrayInitiators=%v",
-		connectivityType, lun, ipsByArrayInitiator)
-	return connectivityType, lun, ipsByArrayInitiator, nil
+	logger.Debugf("PublishContext relevant info : connectivityType=%v, lun=%v, arraySerial=%v, arrayInitiators=%v",
+		connectivityType, lun, arraySerial, ipsByArrayInitiator)
+	return connectivityType, lun, arraySerial, ipsByArrayInitiator, nil
 }
 
 func (n NodeUtils) GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string {

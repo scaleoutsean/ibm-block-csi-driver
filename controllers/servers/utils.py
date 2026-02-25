@@ -623,11 +623,17 @@ def generate_csi_publish_volume_response(lun, connectivity_type, array_initiator
         array_initiators_param = common_config.controller.publish_context_fc_initiators
         publish_context[array_initiators_param] = separator.join(array_initiators)
     elif connectivity_type in [ISCSI_CONNECTIVITY_TYPE, NVME_OVER_ROCE_CONNECTIVITY_TYPE]:
+        array_iqns = []
         for initiator, ips in array_initiators.items():
-            publish_context[initiator] = separator.join(ips)
+            if initiator == "ARRAY_SERIAL_PARAM":
+                serial_param = common_config.controller.get("publish_context_array_serial") or "PUBLISH_CONTEXT_ARRAY_SERIAL"
+                publish_context[serial_param] = separator.join(ips)
+            else:
+                publish_context[initiator] = separator.join(ips)
+                array_iqns.append(initiator)
 
         array_initiators_param = common_config.controller.publish_context_array_iqn
-        publish_context[array_initiators_param] = separator.join(array_initiators.keys())
+        publish_context[array_initiators_param] = separator.join(array_iqns)
 
     response = csi_pb2.ControllerPublishVolumeResponse(publish_context=publish_context)
 

@@ -40,7 +40,7 @@ func (r OsDeviceConnectivityFc) RescanDevices(lunId int, arrayIdentifiers []stri
 	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers)
 }
 
-func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string) (string, error) {
+func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string, lun int, arraySerial string) (string, error) {
 	/*
 	   Return Value: "dm-X" of the volumeID.
 	*/

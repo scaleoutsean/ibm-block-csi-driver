@@ -230,21 +230,26 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         raise array_errors.HostNotFoundError(str(initiators))
 
     def _get_array_initiators(self, host_name, connectivity_type):
+        initiators = {}
         if connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
             target_settings = self.client.get_iscsi_target_settings()
             iqn = target_settings.get('nodeName')
             portals = [p.get('address') for p in target_settings.get('portals', [])]
-            if not iqn:
-                return {}
-            return {iqn: portals}
-        if connectivity_type == array_settings.NVME_OVER_ROCE_CONNECTIVITY_TYPE:
+            if iqn:
+                initiators[iqn] = portals
+        elif connectivity_type == array_settings.NVME_OVER_ROCE_CONNECTIVITY_TYPE:
             target_settings = self.client.get_nvme_target_settings()
             nqn = target_settings.get('nodeName')
             portals = [p.get('address') for p in target_settings.get('portals', [])]
-            if not nqn:
-                return {}
-            return {nqn: portals}
-        return {}
+            if nqn:
+                initiators[nqn] = portals
+            
+            # For NVMe, deterministic by-id paths use the array's serial
+            serial = self.client.get_system_serial()
+            if serial:
+                initiators["ARRAY_SERIAL_PARAM"] = [serial]
+
+        return initiators
 
     def _to_volume_object(self, vol_data):
         return Volume(

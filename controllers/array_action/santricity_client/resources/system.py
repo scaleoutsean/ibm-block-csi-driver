@@ -48,6 +48,19 @@ class SystemResource(ResourceBase):
             summary["management"] = self._extract_code_version(firmware, "management")
 
         try:
+            build = self.build_info()
+        except RequestError as exc:
+            errors.append(f"build info: {exc}")
+        else:
+            summary["symbolApi"] = build.get("symbolVersion")
+
+        return summary
+
+    def get_info(self) -> dict[str, Any]:
+        """Return basic system information, including metadata and serial number."""
+        return self._get("")  # In system scope, this GETs the root system details
+
+    def _buildinfo_url(self) -> str:
             build_info = self.build_info()
         except RequestError as exc:
             errors.append(f"buildinfo: {exc}")
