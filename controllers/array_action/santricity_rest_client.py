@@ -1,3 +1,4 @@
+import os
 import urllib3
 from controllers.common.csi_logger import get_stdout_logger
 from .santricity_client.client import SANtricityClient as NewSANtricityClient
@@ -11,19 +12,32 @@ class SANtricityClient:
     """
     Wrapper for the NetApp SANtricity Python Client Library.
     """
-    def __init__(self, address, user, password, port=8443, verify_ssl=False):
+    def __init__(self, address, user, password, port=8443, verify_ssl=None, system_id=None):
+        if verify_ssl is None:
+            env_verify = os.getenv("SANTRICITY_VERIFY_SSL", "false").lower()
+            verify_ssl = env_verify not in ("false", "0", "no", "off")
+
         base_url = "https://{}:{}/devmgr/v2".format(address, port)
         auth = BasicAuth(username=user, password=password)
         self._client = NewSANtricityClient(
             base_url=base_url,
             auth_strategy=auth,
-            verify_ssl=verify_ssl
+            verify_ssl=verify_ssl,
+            system_id=system_id
         )
-        # Default to system '1' if not specified, matching previous behavior
-        self.system_id = "1"
+
+    @property
+    def system_id(self):
+        """Return the actual system ID (WWN) from the client"""
+        try:
+            return self._client.system_id
+        except Exception:
+            # Fallback if discovery fails during property access
+            return "1"
 
     def get_storage_systems(self):
-        return self._client.system.list()
+        """List storage systems managed by this endpoint"""
+        return self._client.request("GET", "/storage-systems", system_scope=False)
 
     def create_volume(self, pool_id, name, size_gb, raid_level=None, workload_id=None):
         """
@@ -55,6 +69,15 @@ class SANtricityClient:
     def get_volume(self, volume_id):
         """Get specific volume details"""
         return self._client.volumes.get(volume_id)
+
+    def get_volume_by_name(self, name, pool_id=None):
+        """Find a volume by name"""
+        for vol in self.list_volumes():
+            if vol.get("name") == name:
+                if pool_id and vol.get("poolId") != pool_id:
+                    continue
+                return vol
+        return None
 
     def expand_volume(self, volume_id, size_bytes):
         """Expand volume capacity"""

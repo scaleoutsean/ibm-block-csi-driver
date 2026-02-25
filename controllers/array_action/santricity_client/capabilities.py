@@ -9,7 +9,7 @@ from dataclasses import dataclass
 VersionTuple = tuple[int, int, int]
 
 
-@dataclass(slots=True)
+@dataclass
 class CapabilityProfile:
     """Represents the feature surface supported by a SANtricity release family."""
 

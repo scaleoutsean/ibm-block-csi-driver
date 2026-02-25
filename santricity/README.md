@@ -129,3 +129,7 @@ spec:
 There's a "stub" for a SolidFire (iSCSI) driver as well. I've been focused on SolidFire CSI (my "CSI from scratch done right" project), so SolidFire support in IBM Block Storage CSI probably not be delivered.
 
 But if anyone is interested (OpenShift users, etc.) in getting this done, let me know in Issues!
+
+## IBM Block Driver CSI Support
+
+Obviously, don't contact IBM for support for things unrelated to IBM Block Driver CSI Support (which would be anything related to bugs or enhancement requests related to this fork).

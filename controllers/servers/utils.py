@@ -88,10 +88,12 @@ def _get_array_connection_info_from_system_info(secrets, system_id):
     partition_name = secrets.get(servers_settings.SECRET_PARTITION_PARAMETER)
     partition_vg = secrets.get(servers_settings.SECRET_PARTITION_DEFAULT_VG_PARAMETER)
     port_set = secrets.get(servers_settings.SECRET_PORT_SET)
+    verify_ssl = secrets.get(servers_settings.SECRET_VERIFY_SSL, "false").lower() == "true"
     array_addresses = secrets[servers_settings.SECRET_ARRAY_PARAMETER].split(
         servers_settings.PARAMETERS_ARRAY_ADDRESSES_DELIMITER)
     return ArrayConnectionInfo(array_addresses=array_addresses, user=user, password=password, system_id=system_id,
-                               partition_name=partition_name, partition_vg=partition_vg, port_set=port_set)
+                               partition_name=partition_name, partition_vg=partition_vg, port_set=port_set,
+                               verify_ssl=verify_ssl)
 
 
 def get_node_initiators_data(node_name):
