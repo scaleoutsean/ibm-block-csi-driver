@@ -135,11 +135,18 @@ func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(volumeId string, lun int, ar
 }
 
 func (r OsDeviceConnectivityNvmeOFc) FlushMultipathDevice(mpathDevice string) error {
-	return r.HelperScsiGeneric.FlushMultipathDevice(mpathDevice)
+	// For native NVMe multipathing (ANA), we don't use 'multipath -f'.
+	// Instead, we just flush the device buffers.
+	logger.Infof("NVMe: Flushing buffers for device %s", mpathDevice)
+	return r.HelperScsiGeneric.FlushDeviceBuffers(mpathDevice)
 }
 
 func (r OsDeviceConnectivityNvmeOFc) RemovePhysicalDevice(sysDevices []string) error {
-	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
+	// For native NVMe multipathing (ANA), there isn't a simple "delete" file like in SCSI.
+	// We rely on 'nvme disconnect' if we want to remove the connection, but for now we'll
+	// skip the SCSI-specific logic.
+	logger.Infof("NVMe: Skipping SCSI-specific physical device removal for %v", sysDevices)
+	return nil
 }
 
 func (r OsDeviceConnectivityNvmeOFc) RemoveGhostDevice(lun int) error {
