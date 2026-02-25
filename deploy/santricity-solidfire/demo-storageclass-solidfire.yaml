@@ -1,0 +1,25 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: demo-storageclass-solidfire
+provisioner: block.csi.ibm.com
+reclaimPolicy: Delete  # Explicit default to avoid retained volumes when PVCs are removed
+parameters:
+  pool: default
+  # io_group: demo-iogrp             # Optional.
+  # volume_group: demo-volumegroup   # Optional.
+  # SpaceEfficiency: thin            # Optional.
+  volume_name_prefix:                # Optional. Volume name prefix. Default is "ibm_csi".
+  # virt_snap_func: "false"          # Optional. Values true/false. The default is false.
+
+  csi.storage.k8s.io/fstype: xfs     # Optional. Values ext4/xfs. The default is ext4.
+  csi.storage.k8s.io/secret-name: solidfire-secret
+  csi.storage.k8s.io/secret-namespace: default
+  # prefix: ibm_csi
+  csi.storage.k8s.io/provisioner-secret-name: solidfire-secret
+  csi.storage.k8s.io/provisioner-secret-namespace: default
+  csi.storage.k8s.io/controller-publish-secret-name: solidfire-secret
+  csi.storage.k8s.io/controller-publish-secret-namespace: default
+  csi.storage.k8s.io/node-stage-secret-name: solidfire-secret
+  csi.storage.k8s.io/node-stage-secret-namespace: default  
+allowVolumeExpansion: true

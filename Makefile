@@ -74,6 +74,16 @@ test-xunit-in-container:
 gofmt:
 	gofmt -w ./node
 
+.PHONY: vendor-santricity
+vendor-santricity:
+	@echo ">> vendoring santricity-client"
+	rm -rf controllers/array_action/santricity_client
+	rm -rf /tmp/santricity-client
+	git clone --depth 1 https://github.com/scaleoutsean/santricity-client /tmp/santricity-client
+	cp -r /tmp/santricity-client/src/santricity_client controllers/array_action/
+	rm -rf /tmp/santricity-client
+	@echo ">> santricity-client vendored successfully"
+
 .PHONY: csi-build-images-and-push-artifactory
 csi-build-images-and-push-artifactory:
 	./scripts/ci/build_push_images.sh
