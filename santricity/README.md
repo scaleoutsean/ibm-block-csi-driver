@@ -94,6 +94,7 @@ parameters:
 ```
 
 ### 2. Dynamic Disk Pools (DDP)
+
 DDP pools are modern distributed parity pools. While they handle redundancy automatically, the `SpaceEfficiency` parameter can be used to set the preferred redundancy level (defaults to `raid6`).
 
 **Sample StorageClass (with RAID 6 default):**
@@ -118,6 +119,19 @@ provisioner: block.csi.ibm.com
 parameters:
   pool: "ddp_pool"
   SpaceEfficiency: "raid1"
+```
+
+## Update
+
+Update the Controller (StatefulSet):
+
+```sh
+kubectl rollout restart statefulset ibm-block-csi-controller
+```
+
+Update the Node Agents (DaemonSet)
+```sh
+kubectl rollout restart daemonset ibm-block-csi-node
 ```
 
 ## Testing
