@@ -22,7 +22,16 @@ class InterfacesResource(ResourceBase):
         Returns:
             A dictionary containing targetRef, nodeName (IQN), and portals list.
         """
-        return self._get("/iscsi/target-settings")
+        settings = self._get("/iscsi/target-settings")
+        node_name = settings.get("nodeName")
+        if isinstance(node_name, dict):
+            settings["nodeName"] = (
+                node_name.get("iscsiNodeName")
+                or node_name.get("nvmeNodeName")
+                or node_name.get("remoteNodeWWN")
+                or "unknown"
+            )
+        return settings
 
     def get_nvme_target_settings(self) -> dict[str, Any]:
         """Get NVMeoF target settings, including the target NQN and portals.
@@ -33,7 +42,20 @@ class InterfacesResource(ResourceBase):
         Returns:
             A dictionary containing targetRef, nodeName (NQN), and portals list.
         """
-        settings = self._get("/nvmeof/target-settings")
+        settings = self._request_with_fallback(
+            "GET",
+            "/nvmeof/target-settings",
+            fallback_path="/nvmeof/initiator-settings",
+        )
+        node_name = settings.get("nodeName")
+        if isinstance(node_name, dict):
+            settings["nodeName"] = (
+                node_name.get("nvmeNodeName")
+                or node_name.get("iscsiNodeName")
+                or node_name.get("remoteNodeWWN")
+                or "unknown"
+            )
+
         if not settings.get("portals"):
             # Discover portals from interfaces
             portals = []
@@ -48,18 +70,31 @@ class InterfacesResource(ResourceBase):
                         nvmeof_props = nvme_props.get("nvmeofProperties") or {}
                         # Could be ibProperties, roceV2Properties etc.
                         for props_key in ["ibProperties", "roceV2Properties"]:
-                            addr_data = (
-                                (nvmeof_props.get(props_key) or {}).get("ipAddressData") or {}
-                            )
-                            ipv4_data = addr_data.get("ipv4Data") or {}
-                            ip = ipv4_data.get("ipv4Address")
+                            props = nvmeof_props.get(props_key) or {}
+                            # Check multiple possible paths for IP address across API versions
+                            ip = None
+                            ipv4_data = props.get("ipv4Data") or {}
+                            if isinstance(ipv4_data, dict):
+                                # Path 1: ipv4Data.ipv4Address (RoCE - EF600 focus)
+                                ip = ipv4_data.get("ipv4Address")
+                                if not ip:
+                                    # Path 2: ipv4Data.ipv4AddressData.ipv4Address
+                                    ip = (ipv4_data.get("ipv4AddressData") or {}).get(
+                                        "ipv4Address"
+                                    )
+
+                            if not ip:
+                                # Path 3: ipAddressData.ipv4Data.ipv4Address (InfiniBand/Older)
+                                addr_data = props.get("ipAddressData") or {}
+                                ip = (addr_data.get("ipv4Data") or {}).get("ipv4Address")
+
                             if ip and ip != "0.0.0.0":
+                                # If listeningPort is 0 or missing, default to 4420
+                                port = props.get("listeningPort") or 4420
                                 portals.append(
                                     {
                                         "address": ip,
-                                        "port": (nvmeof_props.get(props_key) or {}).get(
-                                            "listeningPort", 4420
-                                        ),
+                                        "port": port,
                                     }
                                 )
                                 break  # Found an IP for this interface
