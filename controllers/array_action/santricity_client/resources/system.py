@@ -52,25 +52,16 @@ class SystemResource(ResourceBase):
         except RequestError as exc:
             errors.append(f"build info: {exc}")
         else:
-            summary["symbolApi"] = build.get("symbolVersion")
+            summary["symbolApi"] = self._extract_component(build, "symbolapi")
+            summary["symbolVersion"] = self._extract_component(build, "symbolversion")
 
+        summary["version"], summary["source"] = self._select_version(summary)
+        summary["errors"] = errors
         return summary
 
     def get_info(self) -> dict[str, Any]:
         """Return basic system information, including metadata and serial number."""
         return self._get("")  # In system scope, this GETs the root system details
-
-    def _buildinfo_url(self) -> str:
-            build_info = self.build_info()
-        except RequestError as exc:
-            errors.append(f"buildinfo: {exc}")
-        else:
-            summary["symbolApi"] = self._extract_component(build_info, "symbolapi")
-            summary["symbolVersion"] = self._extract_component(build_info, "symbolversion")
-
-        summary["version"], summary["source"] = self._select_version(summary)
-        summary["errors"] = errors
-        return summary
 
     def _buildinfo_url(self) -> str:
         return f"{self._devmgr_root()}/utils/buildinfo"
