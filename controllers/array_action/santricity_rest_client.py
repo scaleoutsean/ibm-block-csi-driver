@@ -76,20 +76,24 @@ class SANtricityClient:
         """List storage systems managed by this endpoint"""
         return self._client.request("GET", "/storage-systems", system_scope=False)
 
-    def create_volume(self, pool_id, name, size_gb, raid_level=None, workload_id=None):
+    def create_volume(self, pool_id, label, size_gb, raid_level=None, workload_id=None):
         """
         Create a new volume
         """
         logger.info(
-            "Creating volume: name={}, size={}GB, pool={}, raid={}, workload={}".format(
-                name, size_gb, pool_id, raid_level, workload_id
+            "Creating volume: label={}, size={}GB, pool={}, raid={}, workload={}".format(
+                label, size_gb, pool_id, raid_level, workload_id
             )
         )
+        
+        # Ensure size is a number, not a string. API 422 can be caused by string "12.0"
+        size = int(size_gb) if float(size_gb).is_integer() else float(size_gb)
+        
         payload = {
             "poolId": pool_id,
-            "name": name,
+            "label": label,
             "sizeUnit": "gb",
-            "size": str(size_gb),
+            "size": size,
         }
         if raid_level:
             payload["raidLevel"] = raid_level
@@ -107,11 +111,11 @@ class SANtricityClient:
         """Get specific volume details"""
         return self._client.volumes.get(volume_id)
 
-    def get_volume_by_name(self, name, pool_id=None):
-        """Find a volume by name"""
+    def get_volume_by_name(self, label, pool_id=None):
+        """Find a volume by its label"""
         for vol in self.list_volumes():
-            if vol.get("name") == name:
-                if pool_id and vol.get("poolId") != pool_id:
+            if vol.get("label") == label:
+                if pool_id and vol.get("volumeGroupRef") != pool_id:
                     continue
                 return vol
         return None
