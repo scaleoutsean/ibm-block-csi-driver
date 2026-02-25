@@ -42,7 +42,7 @@ import (
 
 var (
 	getOpts          = metav1.GetOptions{}
-	topologyPrefixes = [...]string{"topology.block.csi.ibm.com"}
+	topologyPrefixes = [...]string{"topology.santricity.block.csi.ibm.com"}
 )
 
 const (

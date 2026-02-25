@@ -2,6 +2,8 @@
 
 This directory contains documentation and sample configurations for using the IBM Block CSI Driver with NetApp SANtricity storage arrays (E-Series).
 
+**WARNING:** this CSI driver uses a minimally changed `CSIDriver` object name in `./common/config.yaml` to avoid conflict with upstream CSI driver name (if installed in the same Kuberntes cluster) and at the same time credit upstream auhors. This fork is **not associated with, or suppored by, IBM**.
+
 ## Build Instructions
 
 To build the driver with SANtricity support, you must vendor the `santricity-client` library. A helper target has been added to the main `Makefile`.
@@ -133,3 +135,4 @@ But if anyone is interested (OpenShift users, etc.) in getting this done, let me
 ## IBM Block Driver CSI Support
 
 Obviously, don't contact IBM for support for things unrelated to IBM Block Driver CSI Support (which would be anything related to bugs or enhancement requests related to this fork).
+
