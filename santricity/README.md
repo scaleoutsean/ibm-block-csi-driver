@@ -6,6 +6,8 @@ This directory contains documentation and sample configurations for using the IB
 
 To build the driver with SANtricity support, you must vendor the `santricity-client` library. A helper target has been added to the main `Makefile`.
 
+If you don't want to build your own, skip to **Installation**.
+
 1.  **Vendor the library**:
     ```bash
     make vendor-santricity
@@ -21,6 +23,26 @@ To build the driver with SANtricity support, you must vendor the `santricity-cli
     ```bash
     docker build -f Dockerfile-csi-node -t ibm-block-csi-node:latest .
     ```
+
+## Installation 
+
+IBM Block Storage CSI Driver requires an "operator". You may use pre-configured YAML files.
+
+```sh
+kubectl apply -f ./deploy/santricity-solidfire/ibm-block-csi-operator.yaml
+kubectl apply -f ./deploy/santricity-solidfire/csi.ibm.com_v1_ibmblockcsi_cr.yaml
+```
+
+This uses pre-built images from Github Container Registry:
+- ghcr.io/scaleoutsean/ibm-block-csi-driver-controller:santricity
+- ghcr.io/scaleoutsean/ibm-block-csi-driver-node:santricity
+
+To avoid conflicting with the usual namespace (`ibm-block-csi`), this CSI driver by default installs in the default namespace. You may modify YAML files as necessary.
+
+Remember to update, and then apply the secret file:
+```sh
+kubectl apply -f ./deploy/secret-santricity.yaml`
+```
 
 ## Storage Configuration
 
@@ -101,3 +123,9 @@ spec:
     persistentVolumeClaim:
       claimName: santricity-test-pvc
 ```
+
+## SolidFire Support
+
+There's a "stub" for a SolidFire (iSCSI) driver as well. I've been focused on SolidFire CSI (my "CSI from scratch done right" project), so SolidFire support in IBM Block Storage CSI probably not be delivered.
+
+But if anyone is interested (OpenShift users, etc.) in getting this done, let me know in Issues!
