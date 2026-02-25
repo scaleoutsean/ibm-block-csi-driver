@@ -387,8 +387,11 @@ func (r OsDeviceConnectivityNvmeOFc) getNvmeDevice(volumeId string) (string, err
 			continue
 		}
 		wwid := strings.TrimSpace(string(content))
-		// Check if uniqueId is in wwid (case-insensitive)
-		if strings.Contains(strings.ToLower(wwid), strings.ToLower(uniqueId)) {
+		// Check if uniqueId is in wwid (case-insensitive) or vice versa
+		// This handles cases where volumeRef contains metadata not in the host WWID
+		lWwid := strings.ToLower(wwid)
+		lUniqueId := strings.ToLower(uniqueId)
+		if strings.Contains(lWwid, lUniqueId) || strings.Contains(lUniqueId, lWwid) {
 			deviceName := filepath.Base(f)
 			devicePath := filepath.Join("/dev", deviceName)
 			logger.Infof("Found NVMe device %s for volume %s", devicePath, volumeId)
@@ -402,7 +405,7 @@ func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(volumeId string, lun int, ar
 	logger.Infof("NVMe GetMpathDevice: Searching devices for volume : [%s] (LUN: %d, Serial: %s)", volumeId, lun, arraySerial)
 
 	// Preference 1: Deterministic path /dev/disk/by-id/nvme-NetApp_E-Series_<SN>_<LUN>
-	if arraySerial != "" && lun > 0 {
+	if arraySerial != "" && lun >= 0 {
 		deterministicPath := fmt.Sprintf("/dev/disk/by-id/nvme-NetApp_E-Series_%s_%d", arraySerial, lun)
 		logger.Debugf("Checking deterministic path: %s", deterministicPath)
 		matches, err := r.Executer.FilepathGlob(deterministicPath)

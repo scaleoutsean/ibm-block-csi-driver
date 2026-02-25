@@ -860,7 +860,7 @@ func convertScsiIdToNguid(scsiId string) string {
 func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int,
 	multipathdCommandFormatArgs []string) (string, error) {
 	formatTemplate := strings.Join(multipathdCommandFormatArgs, mpathdSeparator)
-	args := []string{"show", "maps", "raw", "format", "\"", formatTemplate, "\""}
+	args := []string{"show", "maps", "raw", "format", formatTemplate}
 	logger.Debugf("Waiting for dm to exist")
 	for i := 0; i < maxRetries; i++ {
 		out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
@@ -869,9 +869,12 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeIdVariations []string, m
 		}
 		dms := string(out)
 		for _, volumeIdVariation := range volumeIdVariations {
-			if strings.Contains(dms, volumeIdVariation) {
+			// Check if volumeIdVariation is in dms, or if ANY part of dms is in volumeIdVariation
+			// To handle SANtricity volumeRef vs host WWID discrepancies
+			if strings.Contains(strings.ToLower(dms), strings.ToLower(volumeIdVariation)) {
 				return dms, nil
 			}
+			// More granular check might be needed if dms is a multi-line output
 		}
 
 		time.Sleep(time.Second * time.Duration(intervalSeconds))
@@ -901,8 +904,10 @@ func (GetDmsPathHelperGeneric) getLineParts(scanner *bufio.Scanner) (string, str
 }
 
 func (o GetDmsPathHelperGeneric) IsIndicatorMatchesFilterValues(dmFilterValues []string, indicatorValue string) bool {
+	lIndicator := strings.ToLower(indicatorValue)
 	for _, filterValue := range dmFilterValues {
-		if strings.Contains(indicatorValue, filterValue) {
+		lFilter := strings.ToLower(filterValue)
+		if strings.Contains(lIndicator, lFilter) || strings.Contains(lFilter, lIndicator) {
 			return true
 		}
 	}

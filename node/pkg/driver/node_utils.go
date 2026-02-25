@@ -130,7 +130,7 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string) (
 	strLun := publishContext[n.ConfigYaml.Controller.Publish_context_lun_parameter]
 	arraySerial := publishContext[n.ConfigYaml.Controller.Publish_context_array_serial]
 	publishContextSeparator := n.ConfigYaml.Controller.Publish_context_separator
-	var lun int
+	lun := -1
 	var err error
 	if strLun != "" {
 		lun, err = strconv.Atoi(strLun)
