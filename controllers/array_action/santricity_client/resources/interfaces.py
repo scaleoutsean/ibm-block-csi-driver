@@ -60,6 +60,13 @@ class InterfacesResource(ResourceBase):
             # Discover portals from interfaces
             portals = []
             for interface in self.list():
+                # Skip if physical link is down
+                eth_info = (interface.get("ioInterfaceTypeData", {}) or {}).get("ethernet", {})
+                if eth_info:
+                    link_status = ((eth_info.get("interfaceData") or {}).get("ethernetData") or {}).get("linkStatus")
+                    if link_status and link_status.lower() != "up":
+                        continue
+
                 # EF600 specific check (based on structure in
                 # references/example-EF600-GET-interfaces.json)
                 proto_list = interface.get("commandProtocolPropertiesList", {}) or {}
@@ -71,6 +78,11 @@ class InterfacesResource(ResourceBase):
                         # Could be ibProperties, roceV2Properties etc.
                         for props_key in ["ibProperties", "roceV2Properties"]:
                             props = nvmeof_props.get(props_key) or {}
+                            
+                            # Skip if IP version is not enabled for this specific interface
+                            if not props.get("ipv4Enabled", True) and not props.get("ipv6Enabled", False):
+                                continue
+
                             # Check multiple possible paths for IP address across API versions
                             ip = None
                             ipv4_data = props.get("ipv4Data") or {}
