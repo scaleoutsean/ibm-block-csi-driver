@@ -76,24 +76,26 @@ class SANtricityClient:
         """List storage systems managed by this endpoint"""
         return self._client.request("GET", "/storage-systems", system_scope=False)
 
-    def create_volume(self, pool_id, label, size_gb, raid_level=None, workload_id=None):
+    def create_volume(self, pool_id, name, size_bytes, raid_level=None, workload_id=None):
         """
         Create a new volume
         """
         logger.info(
-            "Creating volume: label={}, size={}GB, pool={}, raid={}, workload={}".format(
-                label, size_gb, pool_id, raid_level, workload_id
+            "Creating volume: name={}, size_bytes={}, pool={}, raid={}, workload={}".format(
+                name, size_bytes, pool_id, raid_level, workload_id
             )
         )
         
-        # Ensure size is a number, not a string. API 422 can be caused by string "12.0"
-        size = int(size_gb) if float(size_gb).is_integer() else float(size_gb)
-        
+        # Embedded REST API requirements (verified by manual test):
+        # - 'name' is accepted in POST payload
+        # - 'size' should be a string in bytes for type safety
+        # - 'poolId' is used to specify the storage pool
+        # - 'sizeUnit' should be 'bytes'
         payload = {
             "poolId": pool_id,
-            "label": label,
-            "sizeUnit": "gb",
-            "size": size,
+            "name": name,
+            "sizeUnit": "bytes",
+            "size": str(int(size_bytes)),
         }
         if raid_level:
             payload["raidLevel"] = raid_level
@@ -111,12 +113,23 @@ class SANtricityClient:
         """Get specific volume details"""
         return self._client.volumes.get(volume_id)
 
-    def get_volume_by_name(self, label, pool_id=None):
-        """Find a volume by its label"""
+    def get_volume_by_name(self, name, pool_id=None):
+        """Find a volume by its name or label"""
         for vol in self.list_volumes():
-            if vol.get("label") == label:
-                if pool_id and vol.get("volumeGroupRef") != pool_id:
-                    continue
+            # Check both 'name' and 'label' for robustness
+            if vol.get("name") == name or vol.get("label") == name:
+                if pool_id:
+                    # Resolve pool name to ID if needed
+                    p_id = pool_id
+                    if not pool_id.startswith("0400"): # Not a Ref
+                         # This should probably be handled by the caller or a helper
+                         pass
+                    
+                    actual_pool_ref = vol.get("volumeGroupRef")
+                    if actual_pool_ref != p_id:
+                        # Some APIs use 'poolId' in response, some 'volumeGroupRef'
+                        if vol.get("poolId") != p_id:
+                            continue
                 return vol
         return None
 

@@ -5,9 +5,9 @@ metadata:
 provisioner: santricity.block.csi.ibm.com
 reclaimPolicy: Delete
 parameters:
-  pool: "1"                          # SANtricity Pool ID or Pool Label (e.g. "1" or "Pool_01")
-  # SpaceEfficiency: raid6            # (Optional) SANtricity RAID level hint (raid1, raid5, raid6, raid10)
-                                     # Defaults to raid6 for DDP pools if not specified.
+  pool: "data"                       # SANtricity Pool ID or Pool Label (e.g. "040000006D039EA0004D008700000F55693865CC" or "Pool_01")
+  # SpaceEfficiency: raid6           # (Optional) SANtricity RAID level hint (raid1, raid5, raid6, raid10)
+                                     # Defaults to raid6 for DDP pools if not specified. Volumes on traditional pools (VGs) follow the VG's RAID level.
   volume_name_prefix: csi            # (Optional)
   
   csi.storage.k8s.io/fstype: xfs
