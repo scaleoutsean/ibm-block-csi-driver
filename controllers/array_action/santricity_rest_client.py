@@ -10,21 +10,58 @@ logger = get_stdout_logger()
 
 class SANtricityClient:
     """
-    Wrapper for the NetApp SANtricity Python Client Library.
+    Enhanced wrapper for the SANtricity Python Client Library.
+    Supports failover across multiple management endpoints.
     """
-    def __init__(self, address, user, password, port=8443, verify_ssl=None, system_id=None):
+    def __init__(self, endpoints, user, password, port=8443, verify_ssl=None, system_id=None):
         if verify_ssl is None:
             env_verify = os.getenv("SANTRICITY_VERIFY_SSL", "false").lower()
             verify_ssl = env_verify not in ("false", "0", "no", "off")
 
-        base_url = "https://{}:{}/devmgr/v2".format(address, port)
-        auth = BasicAuth(username=user, password=password)
-        self._client = NewSANtricityClient(
-            base_url=base_url,
-            auth_strategy=auth,
-            verify_ssl=verify_ssl,
-            system_id=system_id
-        )
+        self.user = user
+        self.password = password
+        self.port = port
+        self.verify_ssl = verify_ssl
+        self.requested_system_id = system_id
+        
+        # Connection details
+        if isinstance(endpoints, str):
+            self.mgmt_ips = [endpoints]
+        else:
+            self.mgmt_ips = endpoints
+
+        self._client = self._connect_to_available_endpoint()
+
+    def _connect_to_available_endpoint(self):
+        """Iterate through management IPs until a connection is established."""
+        auth = BasicAuth(username=self.user, password=self.password)
+        last_error = None
+
+        # Handle port being a list or a single int
+        ports = self.port
+        if not isinstance(ports, list):
+            ports = [ports] * len(self.mgmt_ips)
+
+        for i, ip in enumerate(self.mgmt_ips):
+            current_port = ports[i] if i < len(ports) else ports[0]
+            base_url = "https://{}:{}/devmgr/v2".format(ip, current_port)
+            logger.debug("Attempting to connect to SANtricity endpoint: {}".format(base_url))
+            try:
+                client = NewSANtricityClient(
+                    base_url=base_url,
+                    auth_strategy=auth,
+                    verify_ssl=self.verify_ssl,
+                    system_id=self.requested_system_id
+                )
+                # Verify connection by fetching system_id
+                _ = client.system_id
+                logger.info("Successfully connected to SANtricity endpoint: {}".format(ip))
+                return client
+            except Exception as ex:
+                logger.warning("Failed to connect to {}: {}".format(ip, ex))
+                last_error = ex
+        
+        raise Exception("Could not connect to any SANtricity endpoints: {}".format(last_error))
 
     @property
     def system_id(self):
@@ -134,5 +171,35 @@ class SANtricityClient:
     def get_nvme_target_settings(self):
         """Get NVMe target settings"""
         return self._client.interfaces.get_nvme_target_settings()
+
+    def register_host(self, name, ports=None, host_type_index=-1):
+        """Register a new host on the array"""
+        payload = {
+            "name": name,
+            "hostType": {"index": host_type_index},
+            "ports": ports or []
+        }
+        return self._client.hosts.create(payload)
+
+    def unregister_host(self, host_id):
+        """Remove a host registration"""
+        return self._client.hosts.delete(host_id)
+
+    def append_host_port(self, host_id, label, port_type, address):
+        """Add a port to an existing host"""
+        payload = {
+            "label": label,
+            "type": port_type,
+            "address": address
+        }
+        return self._client.request("POST", f"/hosts/{host_id}/ports", payload=payload)
+
+    def discard_host_port(self, host_id, port_ref):
+        """Remove a port from a host"""
+        return self._client.request("DELETE", f"/hosts/{host_id}/ports/{port_ref}")
+
+    def get_host_types(self):
+        """Fetch available host types for selection"""
+        return self._client.request("GET", "/host-types")
 
 

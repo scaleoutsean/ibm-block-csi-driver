@@ -1,0 +1,22 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: demo-storageclass-santricity
+provisioner: santricity.block.csi.ibm.com
+reclaimPolicy: Delete
+parameters:
+  pool: "1"                          # SANtricity Pool ID or Pool Label (e.g. "1" or "Pool_01")
+  # SpaceEfficiency: raid6            # (Optional) SANtricity RAID level hint (raid1, raid5, raid6, raid10)
+                                     # Defaults to raid6 for DDP pools if not specified.
+  volume_name_prefix: csi            # (Optional)
+  
+  csi.storage.k8s.io/fstype: xfs
+  csi.storage.k8s.io/secret-name: santricity-secret
+  csi.storage.k8s.io/secret-namespace: default
+  csi.storage.k8s.io/provisioner-secret-name: santricity-secret
+  csi.storage.k8s.io/provisioner-secret-namespace: default
+  csi.storage.k8s.io/controller-publish-secret-name: santricity-secret
+  csi.storage.k8s.io/controller-publish-secret-namespace: default
+  csi.storage.k8s.io/node-stage-secret-name: santricity-secret
+  csi.storage.k8s.io/node-stage-secret-namespace: default
+allowVolumeExpansion: true

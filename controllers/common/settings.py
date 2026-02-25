@@ -27,7 +27,7 @@ NAME_FIELD = 'name'
 NAMESPACE_FIELD = 'namespace'
 ANNOTATIONS_FIELD = 'annotations'
 IO_GROUP_DELIMITER = ':'
-IO_GROUP_LABEL_PREFIX = 'hostdefiner.block.csi.ibm.com/io-group-'
+IO_GROUP_LABEL_PREFIX = 'hostdefiner.santricity.block.csi.ibm.com/io-group-'
 
 NODE_INITIATORS_FIELD = 'block.csi.ibm.com/node-initiators'
 

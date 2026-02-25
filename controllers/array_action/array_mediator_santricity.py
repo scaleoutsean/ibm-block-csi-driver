@@ -19,7 +19,7 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
 
     def __init__(self, user, password, endpoint, verify_ssl=False, system_id=None):
         super().__init__(user, password, endpoint, verify_ssl=verify_ssl)
-        self.client = SANtricityClient(endpoint, user, password, verify_ssl=verify_ssl, system_id=system_id)
+        self.client = SANtricityClient(endpoint, user, password, port=self.port, verify_ssl=verify_ssl, system_id=system_id)
         self._identifier = system_id
 
     def disconnect(self):
@@ -185,3 +185,170 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         if not iqn or not portals:
             raise array_errors.NoIscsiTargetsFoundError(self.endpoint)
         return {iqn: portals}
+
+    def create_host(self, host_name, initiators, connectivity_type, io_group, partition_name=None, port_set=None):
+        # We ignore io_group and port_set for SANtricity
+        # Host type index -1 is 'linux' or autodetection in many SANtricity versions
+        host_type_index = -1
+        
+        # Check if already exists
+        existing = self.client.get_host_by_identifiers(host_name)
+        if existing:
+            raise array_errors.HostAlreadyExists(host_name, self.endpoint)
+
+        ports = []
+        if connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
+            for iqn in initiators.iscsi_iqns:
+                ports.append({"type": "iscsi", "address": iqn, "label": f"{host_name}_iscsi"})
+        elif connectivity_type == array_settings.NVME_OVER_ROCE_CONNECTIVITY_TYPE:
+            for nqn in initiators.nvme_nqns:
+                ports.append({"type": "nvmeof", "address": nqn, "label": f"{host_name}_nvme"})
+        
+        try:
+            self.client.register_host(host_name, ports=ports, host_type_index=host_type_index)
+        except Exception as ex:
+            logger.exception("Failed to create host {}".format(host_name))
+            raise ex
+
+    def delete_host(self, host_name):
+        host_data = self.client.get_host_by_identifiers(host_name)
+        if not host_data:
+            return
+        
+        try:
+            self.client.unregister_host(host_data['id'])
+        except Exception as ex:
+            logger.exception("Failed to delete host {}".format(host_name))
+            raise ex
+
+    def add_ports_to_host(self, host_name, initiators, connectivity_type):
+        host_data = self.client.get_host_by_identifiers(host_name)
+        if not host_data:
+            raise array_errors.HostNotFoundError(host_name)
+
+        host_id = host_data['id']
+        current_ports = [p['address'] for p in host_data.get('hostSidePorts', [])]
+
+        if connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
+            for iqn in initiators.iscsi_iqns:
+                if iqn not in current_ports:
+                    self.client.append_host_port(host_id, f"{host_name}_iscsi", "iscsi", iqn)
+        elif connectivity_type == array_settings.NVME_OVER_ROCE_CONNECTIVITY_TYPE:
+            for nqn in initiators.nvme_nqns:
+                if nqn not in current_ports:
+                    self.client.append_host_port(host_id, f"{host_name}_nvme", "nvmeof", nqn)
+
+    def remove_ports_from_host(self, host_name, ports, connectivity_type):
+        host_data = self.client.get_host_by_identifiers(host_name)
+        if not host_data:
+            return
+
+        host_id = host_data['id']
+        for p in host_data.get('hostSidePorts', []):
+            if p['address'] in ports:
+                self.client.discard_host_port(host_id, p['portRef'])
+
+    def get_host_connectivity_ports(self, host_name, connectivity_type):
+        host_data = self.client.get_host_by_identifiers(host_name)
+        if not host_data:
+            raise array_errors.HostNotFoundError(host_name)
+        
+        ports = []
+        for p in host_data.get('hostSidePorts', []):
+            ptype = p.get('type')
+            if connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE and ptype == 'iscsi':
+                ports.append(p['address'])
+            elif connectivity_type == array_settings.NVME_OVER_ROCE_CONNECTIVITY_TYPE and ptype in ['nvmeof', 'nvmeRoce', 'nvme']:
+                ports.append(p['address'])
+        return ports
+
+    def get_host_connectivity_type(self, host_name):
+        host_obj = self.get_host_by_name(host_name)
+        if not host_obj.connectivity_types:
+            return None
+        return host_obj.connectivity_types[0]
+
+    def is_active(self):
+        try:
+            self.client.list_volumes()
+            return True
+        except Exception:
+            return False
+
+    def validate_supported_space_efficiency(self, space_efficiency):
+        if not space_efficiency:
+            return True
+        # For SANtricity, we use space_efficiency as RAID level hint
+        return space_efficiency.lower() in ['raid1', 'raid5', 'raid6', 'raid10', 'none']
+
+    def get_snapshot(self, volume_id, snapshot_name, pool, is_virt_snap_func):
+        raise NotImplementedError()
+
+    def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
+        if object_type == array_settings.VOLUME_TYPE:
+            try:
+                vol_data = self.client.get_volume(object_id)
+                return self._to_volume_object(vol_data)
+            except Exception:
+                return None
+        return None
+
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func, partition_name=None):
+        raise NotImplementedError()
+
+    def delete_snapshot(self, snapshot_id, internal_snapshot_id, partition_name=None):
+        raise NotImplementedError()
+
+    def get_array_fc_wwns(self, host_name):
+        return []
+
+    def get_replication(self, replication_request):
+        return None
+
+    def create_replication(self, replication_request):
+        raise NotImplementedError()
+
+    def delete_replication(self, replication):
+        raise NotImplementedError()
+
+    def promote_replication_volume(self, replication):
+        raise NotImplementedError()
+
+    def demote_replication_volume(self, replication):
+        raise NotImplementedError()
+
+    def add_io_group_to_host(self, host_name, io_group):
+        pass
+
+    def remove_io_group_from_host(self, host_name, io_group):
+        pass
+
+    def get_host_io_group(self, host_name):
+        return ""
+
+    def change_host_protocol(self, host_name, protocol):
+        pass
+
+    def verify_host_partition(self, host_name, new_partition_name):
+        return True
+
+    def verify_volume_group_partition(self, volume_group, partition_name):
+        return True
+
+    def verify_volume_partition(self, volume, partition_name):
+        return True
+
+    def get_volume_mappings(self, volume_id):
+        mappings = {}
+        all_mappings = self.client.list_volume_mappings()
+        all_hosts = {h['id']: h['label'] for h in self.client.list_hosts()}
+        
+        for m in all_mappings:
+            if m['mappableObjectId'] == volume_id:
+                host_id = m['targetId']
+                host_name = all_hosts.get(host_id, host_id)
+                mappings[host_name] = str(m['lun'])
+        return mappings
+
+    def register_plugin(self, unique_key, metadata):
+        pass

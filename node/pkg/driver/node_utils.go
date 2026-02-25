@@ -45,7 +45,7 @@ import (
 var (
 	getOpts          = metav1.GetOptions{}
 	patchOpts        = metav1.PatchOptions{}
-	topologyPrefixes = [...]string{"topology.block.csi.ibm.com"}
+	topologyPrefixes = [...]string{"topology.santricity.block.csi.ibm.com"}
 )
 
 type NvmeType string
