@@ -62,9 +62,18 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
             self._identifier = self.client.system_id
         return self._identifier
 
+    def _get_pool_id(self, pool_name):
+        """Resolve a pool name (label) to its volumeGroupRef ID."""
+        pools = self.client.get_pools()
+        for p in pools:
+            if p.get('label') == pool_name or p.get('volumeGroupRef') == pool_name:
+                return p['volumeGroupRef']
+        return pool_name
+
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
                       source_type, is_virt_snap_func, partition_name=None, partition_vg=None):
         size_gb = size_in_bytes / (1024 ** 3)
+        pool_id = self._get_pool_id(pool)
         
         # SANtricity specific: use 'space_efficiency' parameter from StorageClass 
         # as a hint for RAID level. Defaults to 'raid6' if not specified, 
@@ -77,14 +86,14 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
                 raid_level = None
             
         try:
-            vol_data = self.client.create_volume(pool, name, size_gb, raid_level=raid_level)
+            vol_data = self.client.create_volume(pool_id, name, size_gb, raid_level=raid_level)
             return self._to_volume_object(vol_data)
         except Exception as ex:
             # If raid6 default fails (e.g. on a traditional RAID5 group), retry with None
             if raid_level == 'raid6' and not space_efficiency:
                 logger.info("Failed to create volume with raid6 default, retrying with inherited RAID level")
                 try:
-                    vol_data = self.client.create_volume(pool, name, size_gb, raid_level=None)
+                    vol_data = self.client.create_volume(pool_id, name, size_gb, raid_level=None)
                     return self._to_volume_object(vol_data)
                 except Exception:
                     pass
@@ -197,13 +206,13 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
     def _to_volume_object(self, vol_data):
         return Volume(
             capacity_bytes=int(vol_data['capacity']),
-            id=vol_data['id'],
-            internal_id=vol_data['id'],
-            name=vol_data['name'],
+            id=vol_data['volumeRef'],
+            internal_id=vol_data['volumeRef'],
+            name=vol_data['label'],
             array_address=self.endpoint,
             source_id=None,
             array_type=self.array_type,
-            pool=vol_data['poolId']
+            pool=vol_data['volumeGroupRef']
         )
 
     def copy_to_existing_volume(self, volume_id, source_id, source_capacity_in_bytes, minimum_volume_size_in_bytes):

@@ -175,6 +175,13 @@ spec:
       claimName: santricity-test-pvc
 ```
 
+## Limitations
+
+There are no quotas or other fancy features. Try [santricity-go](https://github.com/scaleoutsean/santricity-go/csi/) or watch your array performance and capacity in a monitoring system such as these.
+
+- [EPA](https://github.com/scaleoutsean/eseries-perf-analyzer) - easy setup
+- [ESC](https://github.com/scaleoutsean/eseries-santricity-collector) - hard (for power users)
+
 ## SolidFire Support
 
 There's a "stub" for a SolidFire (iSCSI) driver as well. I've been focused on SolidFire CSI (my "CSI from scratch done right" project), so SolidFire support in IBM Block Storage CSI probably not be delivered.
