@@ -195,6 +195,14 @@ class SANtricityClient:
         """Get NVMe target settings"""
         return self._client.interfaces.get_nvme_target_settings()
 
+    def get_system_serial(self):
+        """Get the array's serial number."""
+        try:
+            info = self._client.system.get_info()
+            return info.get("serialNumber") or info.get("chassisSerialNumber")
+        except Exception:
+            return None
+
     def register_host(self, name, ports=None, host_type_index=-1):
         """Register a new host on the array"""
         payload = {

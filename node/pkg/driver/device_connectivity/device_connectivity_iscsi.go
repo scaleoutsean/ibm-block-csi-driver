@@ -275,7 +275,7 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []s
 	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers, hostIDs)
 }
 
-func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string) (string, error) {
+func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lun int, arraySerial string) (string, error) {
 	/*
 	   Return Value: "dm-X" of the volumeID.
 	*/

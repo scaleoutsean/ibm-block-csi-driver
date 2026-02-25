@@ -89,6 +89,7 @@ func TestNodeStageVolume(t *testing.T) {
 	conType := ConfigYaml.Connectivity_type.Iscsi
 	volId := "vol-test"
 	lun := 10
+	arraySerial := "serial"
 	dmSysFsName := "dm-2"
 	mpathDevice := "/dev/" + dmSysFsName
 	sysDevices := []string{"/dev/sda", "/dev/sdb"}
@@ -254,7 +255,7 @@ func TestNodeStageVolume(t *testing.T) {
 
 				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(stagingPathWithHostPrefix).Return(true)
-				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext).Return(conType, lun, arraySerial, ipsByArrayInitiator, nil).AnyTimes()
 				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
 				mockOsDeviceCon.EXPECT().EnsureLogin(ipsByArrayInitiator)
 				mockOsDeviceConHelper.EXPECT().RemoveGhostDevice(lun).Return(nil)

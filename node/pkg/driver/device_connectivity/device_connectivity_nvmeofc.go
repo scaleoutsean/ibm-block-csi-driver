@@ -18,6 +18,7 @@ package device_connectivity
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
@@ -55,8 +56,9 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
 	if r.Protocol == "nvmeoroce" {
 		for _, portals := range ipsByArrayInitiator {
 			for _, portal := range portals {
+				// Use 'rdma' as the transport for RoCE, as it's the more common and lab-verified value
 				logger.Debugf("NVMe/RoCE discover and connect on portal: {%s}", portal)
-				args := []string{"discover", "-t", "roce", "-a", portal}
+				args := []string{"discover", "-t", "rdma", "-a", portal}
 				_, err := r.Executer.ExecuteWithTimeout(30000, "nvme", args)
 				if err != nil {
 					logger.Errorf("Failed to discover NVMe/RoCE on portal %s: %v", portal, err)
@@ -64,7 +66,7 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
 				}
 
 				// After discovery, connect-all is often used to establish sessions to all discovered controllers
-				args = []string{"connect-all", "-t", "roce", "-a", portal}
+				args = []string{"connect-all", "-t", "rdma", "-a", portal}
 				_, err = r.Executer.ExecuteWithTimeout(30000, "nvme", args)
 				if err != nil {
 					logger.Errorf("Failed to connect-all NVMe/RoCE on portal %s: %v", portal, err)
@@ -362,7 +364,65 @@ func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ int, _ []string) error {
 	return nil
 }
 
-func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(volumeId string) (string, error) {
+func (r OsDeviceConnectivityNvmeOFc) getNvmeDevice(volumeId string) (string, error) {
+	// volumeId example: 020000006d039ea000493a260000095c699eb957
+	// We want to find a device where /sys/block/nvme*n*/wwid contains the unique part.
+
+	uniqueId := volumeId
+	if len(volumeId) > 8 && (strings.HasPrefix(volumeId, "02000000") || strings.HasPrefix(volumeId, "03000000")) {
+		uniqueId = volumeId[8:]
+	}
+
+	logger.Debugf("Searching for NVMe device with uniqueId: %s", uniqueId)
+
+	files, err := r.Executer.FilepathGlob("/sys/block/nvme*n*")
+	if err != nil {
+		return "", err
+	}
+
+	for _, f := range files {
+		wwidPath := filepath.Join(f, "wwid")
+		content, err := r.Executer.IoutilReadFile(wwidPath)
+		if err != nil {
+			continue
+		}
+		wwid := strings.TrimSpace(string(content))
+		// Check if uniqueId is in wwid (case-insensitive)
+		if strings.Contains(strings.ToLower(wwid), strings.ToLower(uniqueId)) {
+			deviceName := filepath.Base(f)
+			devicePath := filepath.Join("/dev", deviceName)
+			logger.Infof("Found NVMe device %s for volume %s", devicePath, volumeId)
+			return devicePath, nil
+		}
+	}
+	return "", nil
+}
+
+func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(volumeId string, lun int, arraySerial string) (string, error) {
+	logger.Infof("NVMe GetMpathDevice: Searching devices for volume : [%s] (LUN: %d, Serial: %s)", volumeId, lun, arraySerial)
+
+	// Preference 1: Deterministic path /dev/disk/by-id/nvme-NetApp_E-Series_<SN>_<LUN>
+	if arraySerial != "" && lun > 0 {
+		deterministicPath := fmt.Sprintf("/dev/disk/by-id/nvme-NetApp_E-Series_%s_%d", arraySerial, lun)
+		logger.Debugf("Checking deterministic path: %s", deterministicPath)
+		matches, err := r.Executer.FilepathGlob(deterministicPath)
+		if err == nil && len(matches) > 0 {
+			logger.Infof("Found NVMe device via deterministic path: %s", deterministicPath)
+			return deterministicPath, nil
+		}
+		logger.Warningf("Deterministic path %s not found, falling back to WWID search", deterministicPath)
+	}
+
+	// Preference 2: Search by WWID in /sys/block/nvme*n*
+	devicePath, err := r.getNvmeDevice(volumeId)
+	if err == nil && devicePath != "" {
+		return devicePath, nil
+	}
+	if err != nil {
+		logger.Warningf("Error while searching for native NVMe device by WWID: %v", err)
+	}
+
+	// Fallback to legacy multipath behavior
 	return r.HelperScsiGeneric.GetMpathDevice(volumeId)
 }
 
