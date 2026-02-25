@@ -171,6 +171,10 @@ class SANtricityClient:
         """List all registered hosts"""
         return self._client.hosts.list()
 
+    def list_host_groups(self):
+        """List all host groups (clusters)"""
+        return self._client.hosts.list_groups()
+
     def get_host(self, host_id):
         """Get specific host details"""
         return self._client.hosts.get(host_id)

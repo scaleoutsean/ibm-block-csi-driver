@@ -146,9 +146,22 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         if not host_data:
             raise array_errors.HostNotFoundError(host_name)
 
-        host_id = host_data['id']
+        # Embedded API response often uses id, but proxy/unified uses hostRef
+        host_id = host_data.get('id') or host_data.get('hostRef')
+        
+        # Check if host is part of a Host Group (Cluster). 
+        # If so, map to the ClusterRef instead of individual HostRef.
+        cluster_ref = host_data.get('clusterRef')
+        if cluster_ref and cluster_ref != "0000000000000000000000000000000000000000":
+            logger.info("Host {} is part of cluster {}, mapping to cluster instead".format(
+                host_name, cluster_ref
+            ))
+            host_id = cluster_ref
+
         try:
+            # We omit the LUN number to let the array allocate it automatically.
             mapping = self.client.create_volume_mapping(volume_id, host_id)
+            # Both APIs return a 'lun' field in the mapping object
             return str(mapping['lun'])
         except Exception as ex:
             raise array_errors.MappingError(volume_id, host_name, ex)
@@ -159,13 +172,23 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
             logger.info("Host {} not found, assuming unmapped".format(host_name))
             return
 
-        host_id = host_data['id']
+        host_id = host_data.get('id') or host_data.get('hostRef')
+        cluster_ref = host_data.get('clusterRef')
+        
         mappings = self.client.list_volume_mappings()
         
         for m in mappings:
-            if m['mappableObjectId'] == volume_id and m['targetId'] == host_id:
-                self.client.delete_volume_mapping(m['mappingRef'])
-                return
+            # Embedded API response often uses volumeRef/mapRef instead of mappableObjectId/targetId
+            vol_ref = m.get('volumeRef') or m.get('mappableObjectId')
+            target_ref = m.get('mapRef') or m.get('targetId')
+            
+            # Match either the host or the cluster it belongs to
+            if vol_ref == volume_id and (target_ref == host_id or (cluster_ref and target_ref == cluster_ref)):
+                # Use id or lunMappingRef for the mapping itself
+                mapping_id = m.get('id') or m.get('lunMappingRef') or m.get('mappingRef')
+                if mapping_id:
+                    self.client.delete_volume_mapping(mapping_id)
+                    return
         
         logger.info("Mapping not found for volume {} and host {}".format(volume_id, host_name))
 
@@ -399,13 +422,21 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
     def get_volume_mappings(self, volume_id):
         mappings = {}
         all_mappings = self.client.list_volume_mappings()
-        all_hosts = {h['id']: h['label'] for h in self.client.list_hosts()}
+        # Use .get('id') or .get('hostRef') to match either flavor of REST API
+        # Need to collect labels from both individual hosts and host groups (clusters)
+        all_targets = {h.get('id', h.get('hostRef')): h['label'] for h in self.client.list_hosts()}
+        try:
+            all_targets.update({g.get('id', g.get('clusterRef')): g['label'] 
+                               for g in self.client.list_host_groups()})
+        except Exception:
+            pass # Some API versions might only have /hosts or lack /host-groups
         
         for m in all_mappings:
-            if m['mappableObjectId'] == volume_id:
-                host_id = m['targetId']
-                host_name = all_hosts.get(host_id, host_id)
-                mappings[host_name] = str(m['lun'])
+            vol_ref = m.get('volumeRef') or m.get('mappableObjectId')
+            if vol_ref == volume_id:
+                target_id = m.get('mapRef') or m.get('targetId')
+                target_name = all_targets.get(target_id, target_id)
+                mappings[target_name] = str(m['lun'])
         return mappings
 
     def register_plugin(self, unique_key, metadata):
