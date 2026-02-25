@@ -76,13 +76,13 @@ class SANtricityClient:
         """List storage systems managed by this endpoint"""
         return self._client.request("GET", "/storage-systems", system_scope=False)
 
-    def create_volume(self, pool_id, name, size_bytes, raid_level=None, workload_id=None):
+    def create_volume(self, pool_id, name, size_bytes, raid_level=None, workload_id=None, meta_tags=None):
         """
         Create a new volume
         """
         logger.info(
-            "Creating volume: name={}, size_bytes={}, pool={}, raid={}, workload={}".format(
-                name, size_bytes, pool_id, raid_level, workload_id
+            "Creating volume: name={}, size_bytes={}, pool={}, raid={}, workload={}, meta_tags={}".format(
+                name, size_bytes, pool_id, raid_level, workload_id, meta_tags
             )
         )
         
@@ -101,6 +101,8 @@ class SANtricityClient:
             payload["raidLevel"] = raid_level
         if workload_id:
             payload["workloadId"] = workload_id
+        if meta_tags:
+            payload["metaTags"] = meta_tags
             
         return self._client.volumes.create(payload)
 

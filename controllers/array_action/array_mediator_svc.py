@@ -839,7 +839,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     @register_csi_plugin()
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
-                      source_type, is_virt_snap_func, partition_name=None, partition_vg=None):
+                      source_type, is_virt_snap_func, partition_name=None, partition_vg=None, extra_parameters=None):
         if partition_name:
             return self._partition_create_volume(name, size_in_bytes, space_efficiency, pool, io_group, volume_group,
                                                  source_ids, partition_name, partition_vg)

@@ -124,7 +124,7 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
         return self._identifier
 
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
-                      source_type, is_virt_snap_func, partition_name=None, partition_vg=None):
+                      source_type, is_virt_snap_func, partition_name=None, partition_vg=None, extra_parameters=None):
         
         # SolidFire requires an Account ID to create a volume.
         # For MVP, we'll assume a default account named 'csi-admin' exists or create it.

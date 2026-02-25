@@ -5,6 +5,7 @@ from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstra
 from controllers.array_action.santricity_rest_client import SANtricityClient
 from controllers.array_action.utils import ClassProperty
 from controllers.common import settings
+from controllers.servers import settings as servers_settings
 from controllers.common.csi_logger import get_stdout_logger
 
 logger = get_stdout_logger()
@@ -71,7 +72,7 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         return pool_name
 
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
-                      source_type, is_virt_snap_func, partition_name=None, partition_vg=None):
+                      source_type, is_virt_snap_func, partition_name=None, partition_vg=None, extra_parameters=None):
         pool_id = self._get_pool_id(pool)
         
         # SANtricity specific: use 'space_efficiency' parameter from StorageClass 
@@ -83,17 +84,31 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
                 raid_level = space_efficiency.lower()
             elif space_efficiency.lower() == 'none':
                 raid_level = None
+
+        meta_tags = []
+        if extra_parameters:
+            # Map Kubernetes metadata keys to SANtricity tags
+            md_mapping = {
+                "csi.storage.k8s.io/pvc/name": "pvc_name",
+                "csi.storage.k8s.io/pvc/namespace": "pvc_namespace",
+                "csi.storage.k8s.io/pv/name": "pv_name"
+            }
+            for k8s_key, tag_key in md_mapping.items():
+                if value := extra_parameters.get(k8s_key):
+                    meta_tags.append({"key": tag_key, "value": value})
             
         try:
             # Use label=name in payload for Embedded REST API
-            vol_data = self.client.create_volume(pool_id, name, size_in_bytes, raid_level=raid_level)
+            vol_data = self.client.create_volume(pool_id, name, size_in_bytes, raid_level=raid_level, 
+                                                 meta_tags=meta_tags)
             return self._to_volume_object(vol_data)
         except Exception as ex:
             # If raidAll fails, fallback to None
             if raid_level == 'raidAll' and not space_efficiency:
                 logger.info("Failed to create volume with raidAll default, retrying with None")
                 try:
-                    vol_data = self.client.create_volume(pool_id, name, size_in_bytes, raid_level=None)
+                    vol_data = self.client.create_volume(pool_id, name, size_in_bytes, raid_level=None,
+                                                         meta_tags=meta_tags)
                     return self._to_volume_object(vol_data)
                 except Exception:
                     pass
@@ -326,8 +341,10 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         raise NotImplementedError()
 
     def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
-        if object_type == array_settings.VOLUME_TYPE:
+        if object_type == servers_settings.VOLUME_TYPE_NAME:
             try:
+                # SANtricity regular volumes. 
+                # Linked clones (Snap Volumes) will be handled here later.
                 vol_data = self.client.get_volume(object_id)
                 return self._to_volume_object(vol_data)
             except Exception:
