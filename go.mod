@@ -1,8 +1,6 @@
 module github.com/ibm/ibm-block-csi-driver
 
-go 1.24.0
-
-toolchain go1.24.1
+go 1.25.0
 
 require (
 	github.com/container-storage-interface/spec v1.9.0
@@ -10,13 +8,13 @@ require (
 	github.com/kubernetes-csi/csi-lib-utils v0.19.0
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/sync v0.16.0
-	golang.org/x/sys v0.34.0
+	golang.org/x/sys v0.38.0
 	google.golang.org/grpc v1.74.2
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.33.3
 	k8s.io/client-go v0.33.3
-	k8s.io/mount-utils v0.33.3
-	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
+	k8s.io/mount-utils v0.35.0
+	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
 )
 
 require (
