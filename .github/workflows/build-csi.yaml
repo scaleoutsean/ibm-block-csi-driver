@@ -38,7 +38,7 @@ jobs:
             latest
 
       - name: Build and push Controller image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile-csi-controller
@@ -57,7 +57,7 @@ jobs:
             latest
 
       - name: Build and push Node image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile-csi-node
