@@ -2,9 +2,11 @@
 
 This directory contains documentation and sample configurations for using the IBM Block CSI Driver with NetApp SANtricity storage arrays (E-Series).
 
-**WARNING:** this CSI driver uses a minimally changed `CSIDriver` object name in `./common/config.yaml` to avoid conflict with upstream CSI driver name (if installed in the same Kuberntes cluster) and at the same time credit upstream auhors. This fork is **not associated with, or suppored by, IBM**.
+**WARNING:** this CSI driver uses a minimally changed `CSIDriver` object name in `./common/config.yaml` to avoid conflicts with upstream CSI driver name (if installed in the same Kuberntes cluster) and at the same time credit upstream authors (the link still points to ibm.com). This fork is **not associated with, or supported by, IBM**.
 
 ## Capabilities
+
+The IBM Block Storage CSI driver documentation page [lists features and capabilities](https://www.ibm.com/docs/en/stg-block-csi-driver/1.13.0?topic=requirements-features-capabilities) in a more descriptive way.
 
 ### CSI RPC Capabilities
 
@@ -177,21 +179,24 @@ spec:
 
 ## Limitations
 
-There are no quotas or other fancy features. Try [santricity-go](https://github.com/scaleoutsean/santricity-go/csi/) or watch your array performance and capacity in a monitoring system such as these.
+SANtricity DDP allocates storage in 4 GiB chunks, so on small PVCs (less than 20 GB) you may see allocated more than you think or expect. It is recommended to use 4 GiB "units" and over 10 GiB sizes on DDP. Traditional disk groups (RAID 1/5/6) may behave better.
+
+There are no quotas or other fancy features. Try [santricity-go](https://github.com/scaleoutsean/santricity-go/csi/) or watch your array performance and capacity in a monitoring system such as these two:
 
 - [EPA](https://github.com/scaleoutsean/eseries-perf-analyzer) - easy setup
 - [ESC](https://github.com/scaleoutsean/eseries-santricity-collector) - hard (for power users)
 
-IBM Block Driver CSI creates (too) unique volume names that aren't supposed to be readable by humans. And that's fine, PVC names are readable but impossible to memorize anyway. This fork attaches metadatta tags to volumes, so if you use ESC mentioned above, you can track them in Grafana. What's injected in SANtricity volume metadata:
+IBM Block Storage CSI drivers creates (too?) unique volume names that aren't supposed to be readable by humans. And that's fine, PVC names are readable but impossible to memorize anyway. This fork attaches Kubernetes PVC metadata tags to SANtricity volumes, so if you use ESC (mentioned above) you can track them in InfluxDB and watch them in Grafana. What's injected in SANtricity volume metadata:
 - pvc_name - from csi.storage.k8s.io/pvc/name  
 - pvc_namespace - from csi.storage.k8s.io/pvc/namespace
 - pv_name - from csi.storage.k8s.io/pv/name
+- fstype - from csi.storage.k8s.io/fstype
 
 ## SolidFire Support
 
-There's a "stub" for a SolidFire (iSCSI) driver as well. I've been focused on SolidFire CSI (my "CSI from scratch done right" project), so SolidFire support in IBM Block Storage CSI probably not be delivered.
+There's a "stub" for a SolidFire (iSCSI) driver as well. I've been focused on SolidFire CSI (my "CSI from scratch done right" project), so SolidFire support in IBM Block Storage CSI will probably not be delivered unless someone needs it.
 
-But if anyone is interested (OpenShift users, etc.) in getting this done, let me know in Issues!
+If anyone is interested (OpenShift users, etc.) in getting this done, let me know in Issues. Because SolidFire uses iSCSI, adopting it would be easier than it was for SANtricity.
 
 ## IBM Block Driver CSI Support
 

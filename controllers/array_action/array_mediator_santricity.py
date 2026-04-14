@@ -91,7 +91,8 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
             md_mapping = {
                 "csi.storage.k8s.io/pvc/name": "pvc_name",
                 "csi.storage.k8s.io/pvc/namespace": "pvc_namespace",
-                "csi.storage.k8s.io/pv/name": "pv_name"
+                "csi.storage.k8s.io/pv/name": "pv_name",
+                "csi.storage.k8s.io/fstype": "fstype"
             }
             for k8s_key, tag_key in md_mapping.items():
                 if value := extra_parameters.get(k8s_key):
