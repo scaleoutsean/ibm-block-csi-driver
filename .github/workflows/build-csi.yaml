@@ -29,7 +29,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Controller
         id: meta-controller
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-controller
           tags: |
@@ -48,7 +48,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Node
         id: meta-node
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-node
           tags: |
