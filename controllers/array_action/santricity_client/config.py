@@ -8,7 +8,7 @@ from dataclasses import dataclass
 SYMBOL_LEGACY_PATH = "symbol"
 
 
-@dataclass
+@dataclass(slots=True)
 class ClientConfig:
     """Typed configuration for `SANtricityClient`."""
 
@@ -33,7 +33,7 @@ class ClientConfig:
         return dict(self.query_defaults or {})
 
 
-@dataclass
+@dataclass(slots=True)
 class RequestParams:
     """Bundle together prepared request details."""
 

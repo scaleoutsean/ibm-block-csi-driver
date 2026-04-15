@@ -17,6 +17,30 @@ class VolumesResource(ResourceBase):
     def get(self, volume_ref: str) -> dict[str, Any]:
         return self._get(f"/volumes/{volume_ref}")
 
+    def get_volume_by_name(self, name: str, pool_name: str | None = None) -> dict[str, Any] | None:
+        """Find a volume by its name or label, optionally filtering by pool name.
+
+        Args:
+            name: The name or label of the volume.
+            pool_name: Optional name or label of the storage pool containing the volume.
+
+        Returns:
+            The volume object if found, else None.
+        """
+        target_pool_ref = None
+        if pool_name:
+            pool = self._client.pools.get_by_name(pool_name)
+            if not pool:
+                return None
+            target_pool_ref = pool.get("volumeGroupRef") or pool.get("id")
+
+        for volume in self.list():
+            if volume.get("label") == name or volume.get("name") == name:
+                if target_pool_ref and volume.get("volumeGroupRef") != target_pool_ref:
+                    continue
+                return volume
+        return None
+
     def delete(self, volume_ref: str) -> dict[str, Any]:
         return self._delete(f"/volumes/{volume_ref}")
 

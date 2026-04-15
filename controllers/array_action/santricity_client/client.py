@@ -83,11 +83,6 @@ class SANtricityClient:
     def __exit__(self, exc_type, exc, tb) -> None:  # pragma: no cover - passthrough
         self.close()
 
-    @property
-    def system_id(self) -> str:
-        """Return the current system identifier (discovered if necessary)."""
-        return self._get_system_id()
-
     # Public API --------------------------------------------------------------
     def request(
         self,
