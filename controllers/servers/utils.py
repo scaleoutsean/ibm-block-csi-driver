@@ -161,6 +161,17 @@ def _str_to_bool(parameter):
     return False
 
 
+def _normalize_utf8_text(value):
+    """Return a UTF-8-safe string for gRPC/protobuf string fields."""
+    if value is None:
+        return ""
+    text = str(value)
+    safe_text = text.encode("utf-8", errors="replace").decode("utf-8")
+    if safe_text != text:
+        logger.warning("Normalized non-UTF8 text in response field")
+    return safe_text
+
+
 def get_object_parameters(parameters, prefix_param_name, system_id):
     raw_parameters_by_system = parameters.get(servers_settings.PARAMETERS_BY_SYSTEM)
     system_parameters = {}
@@ -198,11 +209,14 @@ def get_volume_group_id(new_volume_group, system_id):
 
 def _get_object_id(obj, obj_strong_id, system_id):
     object_ids_delimiter = servers_settings.PARAMETERS_OBJECT_IDS_DELIMITER
-    object_ids_value = object_ids_delimiter.join((obj.internal_id, obj_strong_id))
+    internal_id = _normalize_utf8_text(obj.internal_id)
+    strong_id = _normalize_utf8_text(obj_strong_id)
+    object_ids_value = object_ids_delimiter.join((internal_id, strong_id))
     object_id_info_delimiter = servers_settings.PARAMETERS_OBJECT_ID_INFO_DELIMITER
+    array_type = _normalize_utf8_text(obj.array_type)
     if system_id:
-        return object_id_info_delimiter.join((obj.array_type, system_id, object_ids_value))
-    return object_id_info_delimiter.join((obj.array_type, object_ids_value))
+        return object_id_info_delimiter.join((array_type, _normalize_utf8_text(system_id), object_ids_value))
+    return object_id_info_delimiter.join((array_type, object_ids_value))
 
 
 def _is_system_id_valid(system_id):

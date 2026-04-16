@@ -74,6 +74,25 @@ kubectl apply -f ./deploy/santricity-solidfire/csi.ibm.com_v1_ibmblockcsi_cr.yam
 
 You can test installation flow without an attached E-Series array. The operator, CRDs, and CSI workloads should deploy. Volume provisioning will fail until `secret-santricity.yaml` points to a reachable array.
 
+## Call Home and Privacy
+
+For this SANtricity fork, call-home registration to storage arrays is currently not sent.
+
+- The generic call-home registration path exists in the upstream code for SVC-family arrays.
+- In the SANtricity mediator, `register_plugin()` is a no-op (`pass`), so no `registerplugin` command is executed.
+- Default call-home metadata is still generated in process startup code, and logged by the controller.
+
+If you want explicit privacy/compliance posture, set the custom resource field below:
+
+```yaml
+spec:
+  enableCallHome: "false"
+```
+
+This prevents call-home registration attempts in environments where that path is implemented.
+
+For SANtricity specifically, this is also a clear and auditable policy setting.
+
 This uses pre-built images from Github Container Registry:
 - ghcr.io/scaleoutsean/ibm-block-csi-driver-controller:latest
 - ghcr.io/scaleoutsean/ibm-block-csi-driver-node:latest

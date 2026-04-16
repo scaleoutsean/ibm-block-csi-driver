@@ -9,6 +9,9 @@ metadata:
     app.kubernetes.io/managed-by: ibm-block-csi-operator
     release: v1.13.1
 spec:
+  # Explicitly disable call-home for SANtricity deployments.
+  enableCallHome: "false"
+
   # controller is a statefulSet with ibm-block-csi-controller container
   # and csi-provisioner, csi-attacher, csi-snapshotter and livenessprobe sidecars.
   controller:

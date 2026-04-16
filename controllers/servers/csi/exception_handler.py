@@ -6,6 +6,16 @@ from controllers.servers.errors import ValidationException
 
 logger = get_stdout_logger()
 
+
+def _normalize_utf8_text(value):
+    if value is None:
+        return ""
+    text = str(value)
+    safe_text = text.encode("utf-8", errors="replace").decode("utf-8")
+    if safe_text != text:
+        logger.warning("Normalized non-UTF8 text in gRPC error details")
+    return safe_text
+
 status_codes_by_exception = {
     NotImplementedError: grpc.StatusCode.UNIMPLEMENTED,
     ValidationException: grpc.StatusCode.INVALID_ARGUMENT,
@@ -21,7 +31,7 @@ status_codes_by_exception = {
 
 
 def _build_non_ok_response(message, context, status_code, response_type):
-    context.set_details(message)
+    context.set_details(_normalize_utf8_text(message))
     context.set_code(status_code)
     return response_type()
 
