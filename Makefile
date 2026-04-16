@@ -23,6 +23,8 @@ BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS?="-X ${PKG}/node/pkg/driver.gitCommit=${GIT_COMMIT} -X ${PKG}/node/pkg/driver.buildDate=${BUILD_DATE} -s -w"
 GO111MODULE=on
 DRIVER_CONFIG_YML=$(shell pwd)/common/config.yaml
+SANTRICITY_CLIENT_REPO?=https://github.com/scaleoutsean/santricity-client
+SANTRICITY_CLIENT_REF?=0.1.7
 # -race is not supported on Z
 GO_TEST_FLAGS=$(shell if [ "$$(uname -m)" = "s390x" ]; then echo "-v"; else echo "-v -race"; fi)
 
@@ -76,10 +78,10 @@ gofmt:
 
 .PHONY: vendor-santricity
 vendor-santricity:
-	@echo ">> vendoring santricity-client"
+	@echo ">> vendoring santricity-client from ref $(SANTRICITY_CLIENT_REF)"
 	rm -rf controllers/array_action/santricity_client
 	rm -rf /tmp/santricity-client
-	git clone --depth 1 https://github.com/scaleoutsean/santricity-client /tmp/santricity-client
+	git clone --depth 1 --branch $(SANTRICITY_CLIENT_REF) $(SANTRICITY_CLIENT_REPO) /tmp/santricity-client
 	cp -r /tmp/santricity-client/src/santricity_client controllers/array_action/
 	rm -rf /tmp/santricity-client
 	@echo ">> santricity-client vendored successfully"

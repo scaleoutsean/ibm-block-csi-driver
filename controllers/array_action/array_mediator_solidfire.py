@@ -150,7 +150,7 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
             logger.exception("Failed to create volume")
             raise array_errors.VolumeCreationError(final_name)
 
-    def delete_volume(self, volume_id):
+    def delete_volume(self, volume_id, partition_name=None):
         try:
             self.client.delete_volume(volume_id)
         except Exception as ex:
