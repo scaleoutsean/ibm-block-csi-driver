@@ -178,6 +178,10 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
     def get_array_fc_wwns(self, host_name):
         return []
 
+    def get_nvme_target_ports(self):
+        # SolidFire implementation in this repository is iSCSI-focused.
+        return []
+
     def get_host_connectivity_ports(self, host_name):
         return []
 

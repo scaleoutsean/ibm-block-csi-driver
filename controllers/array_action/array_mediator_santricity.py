@@ -275,6 +275,10 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
             raise array_errors.NoIscsiTargetsFoundError(self.endpoint)
         return {iqn: portals}
 
+    def get_nvme_target_ports(self):
+        """SANtricity integration currently uses NVMe/RoCE discovery, not NVMe/FC WWNN/WWPN pairs."""
+        return []
+
     def create_host(self, host_name, initiators, connectivity_type, io_group, partition_name=None, port_set=None):
         # We ignore io_group and port_set for SANtricity
         # Host type index -1 is 'linux' or autodetection in many SANtricity versions

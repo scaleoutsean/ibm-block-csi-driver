@@ -76,7 +76,7 @@ You can test installation flow without an attached E-Series array. The operator,
 
 ## Call Home and Privacy
 
-For this SANtricity fork, call-home registration to storage arrays is currently not sent.
+For this SANtricity fork, call-home registration to storage arrays is **not** sent.
 
 - The generic call-home registration path exists in the upstream code for SVC-family arrays.
 - In the SANtricity mediator, `register_plugin()` is a no-op (`pass`), so no `registerplugin` command is executed.
