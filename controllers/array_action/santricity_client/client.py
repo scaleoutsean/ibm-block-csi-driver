@@ -339,6 +339,11 @@ class SANtricityClient:
         self._scoped_prefix_cache = f"/storage-systems/{system_id}"
         return self._scoped_prefix_cache
 
+    @property
+    def system_id(self) -> str:
+        """Public accessor for the storage system identifier."""
+        return self._get_system_id()
+
     def _get_system_id(self) -> str:
         if self._system_id:
             return self._system_id

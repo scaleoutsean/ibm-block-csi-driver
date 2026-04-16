@@ -16,7 +16,7 @@ spec:
   # and csi-provisioner, csi-attacher, csi-snapshotter and livenessprobe sidecars.
   controller:
     repository: ghcr.io/scaleoutsean/ibm-block-csi-driver-controller
-    tag: "sha-5c35c81"
+    tag: "sha-67fbf9a"
     imagePullPolicy: IfNotPresent
     affinity:
       nodeAffinity:
@@ -34,7 +34,7 @@ spec:
   # and csi-node-driver-registrar and livenessprobe sidecars.
   node:
     repository: ghcr.io/scaleoutsean/ibm-block-csi-driver-node
-    tag: "sha-5c35c81"
+    tag: "sha-67fbf9a"
     imagePullPolicy: IfNotPresent
     affinity:
       nodeAffinity:
