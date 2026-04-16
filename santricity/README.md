@@ -1,6 +1,8 @@
 # IBM Block CSI Driver for NetApp SANtricity
 
-This directory contains documentation and sample configurations for using the IBM Block CSI Driver with NetApp SANtricity storage arrays (E-Series).
+This directory contains documentation and sample configurations for using the IBM Block CSI Driver with NetApp SANtricity storage arrays (E-Series). 
+
+What **is** this thing? See [this blog post](https://scaleoutsean.github.io/2026/02/26/ibm-block-storage-cis-driver-santricity-fork.html).
 
 **WARNING:** this CSI driver uses a minimally changed `CSIDriver` object name in `./common/config.yaml` to avoid conflicts with upstream CSI driver name (if installed in the same Kuberntes cluster) and at the same time credit upstream authors (the link still points to ibm.com). This fork is **not associated with, or supported by, IBM**.
 
@@ -73,8 +75,9 @@ This uses pre-built images from Github Container Registry:
 To avoid conflicting with the usual namespace (`ibm-block-csi`), this CSI driver by default installs in the default namespace. You may modify YAML files as necessary.
 
 Remember to update, and then apply the secret file:
+
 ```sh
-kubectl apply -f ./deploy/secret-santricity.yaml`
+kubectl apply -f ./deploy/secret-santricity.yaml
 ```
 
 ## Storage Configuration
@@ -82,9 +85,11 @@ kubectl apply -f ./deploy/secret-santricity.yaml`
 The driver supports two types of SANtricity storage entities: **Traditional Volume Groups** and **Dynamic Disk Pools (DDP)**.
 
 ### 1. Traditional Volume Groups (RAID 1/5/6)
+
 Traditional groups define the RAID level at the group level. Volumes created in these groups inherit the group's RAID properties. Do **not** specify `SpaceEfficiency` in the `StorageClass`.
 
 **Sample StorageClass:**
+
 ```yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -100,6 +105,7 @@ parameters:
 DDP pools are modern distributed parity pools. While they handle redundancy automatically, the `SpaceEfficiency` parameter can be used to set the preferred redundancy level (defaults to `raid6`).
 
 **Sample StorageClass (with RAID 6 default):**
+
 ```yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -112,6 +118,7 @@ parameters:
 ```
 
 **Sample StorageClass (with RAID 1 override):**
+
 ```yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -132,6 +139,7 @@ kubectl rollout restart statefulset ibm-block-csi-controller
 ```
 
 Update the Node Agents (DaemonSet)
+
 ```sh
 kubectl rollout restart daemonset ibm-block-csi-node
 ```

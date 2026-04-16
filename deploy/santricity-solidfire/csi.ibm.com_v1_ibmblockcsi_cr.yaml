@@ -7,14 +7,14 @@ metadata:
     app.kubernetes.io/name: ibm-block-csi
     app.kubernetes.io/instance: ibm-block-csi
     app.kubernetes.io/managed-by: ibm-block-csi-operator
-    release: v1.13.0
+    release: v1.13.1
 spec:
   # controller is a statefulSet with ibm-block-csi-controller container
   # and csi-provisioner, csi-attacher, csi-snapshotter and livenessprobe sidecars.
   controller:
     repository: ghcr.io/scaleoutsean/ibm-block-csi-driver-controller
-    tag: "santricity"
-    imagePullPolicy: Always
+    tag: "latest"
+    imagePullPolicy: IfNotPresent
     affinity:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
@@ -31,8 +31,8 @@ spec:
   # and csi-node-driver-registrar and livenessprobe sidecars.
   node:
     repository: ghcr.io/scaleoutsean/ibm-block-csi-driver-node
-    tag: "santricity"
-    imagePullPolicy: Always
+    tag: "latest"
+    imagePullPolicy: IfNotPresent
     affinity:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
