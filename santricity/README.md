@@ -69,15 +69,15 @@ kubectl apply -f ./deploy/santricity-solidfire/csi.ibm.com_v1_ibmblockcsi_cr.yam
 ```
 
 This uses pre-built images from Github Container Registry:
-- ghcr.io/scaleoutsean/ibm-block-csi-driver-controller:santricity
-- ghcr.io/scaleoutsean/ibm-block-csi-driver-node:santricity
+- ghcr.io/scaleoutsean/ibm-block-csi-driver-controller:latest
+- ghcr.io/scaleoutsean/ibm-block-csi-driver-node:latest
 
 To avoid conflicting with the usual namespace (`ibm-block-csi`), this CSI driver by default installs in the default namespace. You may modify YAML files as necessary.
 
 Remember to update, and then apply the secret file:
 
 ```sh
-kubectl apply -f ./deploy/secret-santricity.yaml
+kubectl apply -f ./deploy/santricity-solidfire/secret-santricity.yaml
 ```
 
 ## Storage Configuration
@@ -187,14 +187,12 @@ spec:
 
 ## Limitations
 
-SANtricity DDP allocates storage in 4 GiB chunks, so on small PVCs (less than 20 GB) you may see allocated more than you think or expect. It is recommended to use 4 GiB "units" and over 10 GiB sizes on DDP. Traditional disk groups (RAID 1/5/6) may behave better.
+SANtricity DDP allocates storage in 4 GiB chunks, so on small PVCs (less than 20 GB) you may see allocated more than you think or expect. It is recommended to use 4 GiB "units" and over 10 GiB sizes on DDP. Traditional disk groups (RAID 1/5/6) allocate precisely.
 
-There are no quotas or other fancy features. Try [santricity-go](https://github.com/scaleoutsean/santricity-go/csi/) or watch your array performance and capacity in a monitoring system such as these two:
-
-- [EPA](https://github.com/scaleoutsean/eseries-perf-analyzer) - easy setup
-- [ESC](https://github.com/scaleoutsean/eseries-santricity-collector) - hard (for power users)
+There are no quotas or other fancy features. Try [santricity-go](https://github.com/scaleoutsean/santricity-go/csi/) for status reporting, or watch your array performance and capacity in a monitoring system such as [EPA](https://github.com/scaleoutsean/eseries-perf-analyzer).
 
 IBM Block Storage CSI drivers creates (too?) unique volume names that aren't supposed to be readable by humans. And that's fine, PVC names are readable but impossible to memorize anyway. This fork attaches Kubernetes PVC metadata tags to SANtricity volumes, so if you use ESC (mentioned above) you can track them in InfluxDB and watch them in Grafana. What's injected in SANtricity volume metadata:
+
 - pvc_name - from csi.storage.k8s.io/pvc/name  
 - pvc_namespace - from csi.storage.k8s.io/pvc/namespace
 - pv_name - from csi.storage.k8s.io/pv/name
