@@ -65,8 +65,14 @@ IBM Block Storage CSI Driver requires an "operator". You may use pre-configured 
 
 ```sh
 kubectl apply -f ./deploy/santricity-solidfire/ibm-block-csi-operator.yaml
+# Wait for CRDs to be registered by the API server before applying the custom resource
+kubectl wait --for=condition=Established --timeout=120s crd/hostdefiners.csi.ibm.com
+kubectl wait --for=condition=Established --timeout=120s crd/hostdefinitions.csi.ibm.com
+kubectl wait --for=condition=Established --timeout=120s crd/ibmblockcsis.csi.ibm.com
 kubectl apply -f ./deploy/santricity-solidfire/csi.ibm.com_v1_ibmblockcsi_cr.yaml
 ```
+
+You can test installation flow without an attached E-Series array. The operator, CRDs, and CSI workloads should deploy. Volume provisioning will fail until `secret-santricity.yaml` points to a reachable array.
 
 This uses pre-built images from Github Container Registry:
 - ghcr.io/scaleoutsean/ibm-block-csi-driver-controller:latest
