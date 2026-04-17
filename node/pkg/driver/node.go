@@ -529,13 +529,36 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 func (d *NodeService) publishFileSystemVolume(stagingPath string, targetPath string, fsType string) error {
 	mountOptions := []string{"bind"}
 	logger.Debugf("Bind mount staging: {%v} with target: {%v}, fs_type: {%v}", stagingPath, targetPath, fsType)
-	return d.Mounter.Mount(stagingPath, targetPath, fsType, mountOptions) // Passing without /host because k8s mounter uses mount\mkfs\fsck
+	err := d.Mounter.Mount(stagingPath, targetPath, fsType, mountOptions)
+	if err == nil {
+		return nil
+	}
+
+	if strings.Contains(strings.ToLower(err.Error()), "no such file or directory") {
+		stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
+		targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
+		logger.Warningf("Bind mount with kubelet paths failed, retrying with host-prefixed paths. source=%s target=%s err=%v", stagingPathWithHostPrefix, targetPathWithHostPrefix, err)
+		return d.Mounter.Mount(stagingPathWithHostPrefix, targetPathWithHostPrefix, fsType, mountOptions)
+	}
+
+	return err
 }
 
 func (d *NodeService) publishRawBlockVolume(mpathDevice string, targetPath string) error {
 	options := []string{"bind"}
 	logger.Debugf("Mount the device to raw block volume. Target : {%s}, device : {%s}", targetPath, mpathDevice)
-	return d.Mounter.Mount(mpathDevice, targetPath, "", options)
+	err := d.Mounter.Mount(mpathDevice, targetPath, "", options)
+	if err == nil {
+		return nil
+	}
+
+	if strings.Contains(strings.ToLower(err.Error()), "no such file or directory") {
+		targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
+		logger.Warningf("Raw block bind mount with kubelet path failed, retrying with host-prefixed target. target=%s err=%v", targetPathWithHostPrefix, err)
+		return d.Mounter.Mount(mpathDevice, targetPathWithHostPrefix, "", options)
+	}
+
+	return err
 }
 
 // targetPathWithHostPrefix: path of target
@@ -634,6 +657,11 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	}
 	if !isNotMounted {
 		err = d.Mounter.Unmount(target)
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), "no such file or directory") {
+			targetPathWithHostPrefix := d.NodeUtils.GetPodPath(target)
+			logger.Warningf("Unmount with kubelet path failed, retrying with host-prefixed target. target=%s err=%v", targetPathWithHostPrefix, err)
+			err = d.Mounter.Unmount(targetPathWithHostPrefix)
+		}
 		if err != nil {
 			logger.Errorf("Unmount failed. Target : %q, err : %v", target, err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
