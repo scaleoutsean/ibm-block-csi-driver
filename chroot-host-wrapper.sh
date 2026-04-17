@@ -16,7 +16,17 @@ for p in /usr/bin /usr/sbin /sbin /bin; do
 done
 
 if [ -x "${DIR}/usr/bin/${ME}" ] || [ -x "${DIR}/usr/sbin/${ME}" ] || [ -x "${DIR}/sbin/${ME}" ] || [ -x "${DIR}/bin/${ME}" ]; then
-    exec chroot "$DIR" /usr/bin/env -i PATH="/sbin:/bin:/usr/bin:/usr/sbin" "${ME}" "${@:1}"
+    ARGS=()
+    for arg in "$@"; do
+        if [[ "$arg" == "$DIR/"* ]]; then
+            ARGS+=("${arg#$DIR}")
+        elif [[ "$arg" == "$DIR" ]]; then
+            ARGS+=("/")
+        else
+            ARGS+=("$arg")
+        fi
+    done
+    exec chroot "$DIR" /usr/bin/env -i PATH="/sbin:/bin:/usr/bin:/usr/sbin" "${ME}" "${ARGS[@]}"
 fi
 
 echo "${ME} not found on host or in container"
