@@ -529,16 +529,22 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 func (d *NodeService) publishFileSystemVolume(stagingPath string, targetPath string, fsType string) error {
 	mountOptions := []string{"bind"}
 	logger.Debugf("Bind mount staging: {%v} with target: {%v}, fs_type: {%v}", stagingPath, targetPath, fsType)
-	err := d.Mounter.Mount(stagingPath, targetPath, fsType, mountOptions)
+
+	// Since we're executing through the chroot wrapper, and inside a container where the host
+	// filesystem is mounted at /host, the k8s mounter (which runs statfs first) will fail
+	// if we don't present paths with /host prefixes. Try the host-prefixed paths first.
+	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
+	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
+
+	err := d.Mounter.Mount(stagingPathWithHostPrefix, targetPathWithHostPrefix, fsType, mountOptions)
 	if err == nil {
 		return nil
 	}
 
+	// Fallback to regular paths just in case (e.g. running natively outside a container daemonset)
 	if strings.Contains(strings.ToLower(err.Error()), "no such file or directory") {
-		stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
-		targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
-		logger.Warningf("Bind mount with kubelet paths failed, retrying with host-prefixed paths. source=%s target=%s err=%v", stagingPathWithHostPrefix, targetPathWithHostPrefix, err)
-		return d.Mounter.Mount(stagingPathWithHostPrefix, targetPathWithHostPrefix, fsType, mountOptions)
+		logger.Warningf("Bind mount with host-prefixed paths failed, retrying with raw kubelet paths. source=%s target=%s err=%v", stagingPath, targetPath, err)
+		return d.Mounter.Mount(stagingPath, targetPath, fsType, mountOptions)
 	}
 
 	return err
@@ -547,15 +553,16 @@ func (d *NodeService) publishFileSystemVolume(stagingPath string, targetPath str
 func (d *NodeService) publishRawBlockVolume(mpathDevice string, targetPath string) error {
 	options := []string{"bind"}
 	logger.Debugf("Mount the device to raw block volume. Target : {%s}, device : {%s}", targetPath, mpathDevice)
-	err := d.Mounter.Mount(mpathDevice, targetPath, "", options)
+
+	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
+	err := d.Mounter.Mount(mpathDevice, targetPathWithHostPrefix, "", options)
 	if err == nil {
 		return nil
 	}
 
 	if strings.Contains(strings.ToLower(err.Error()), "no such file or directory") {
-		targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
-		logger.Warningf("Raw block bind mount with kubelet path failed, retrying with host-prefixed target. target=%s err=%v", targetPathWithHostPrefix, err)
-		return d.Mounter.Mount(mpathDevice, targetPathWithHostPrefix, "", options)
+		logger.Warningf("Raw block bind mount with host-prefixed path failed, retrying with raw kubelet target. target=%s err=%v", targetPath, err)
+		return d.Mounter.Mount(mpathDevice, targetPath, "", options)
 	}
 
 	return err
