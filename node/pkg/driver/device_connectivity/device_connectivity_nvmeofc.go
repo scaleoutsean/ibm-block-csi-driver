@@ -32,6 +32,7 @@ const (
 	FCPortPath                          = "/sys/class/fc_host/host*/port_name"
 	nvmeTargetPathCount                 = 3
 	nvmeMinPathsForNonNativeDmMultipath = 2
+	nvmeRoceTargetConnections           = 2
 )
 
 type OsDeviceConnectivityNvmeOFc struct {
@@ -54,23 +55,41 @@ func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, clean_s
 func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string][]string) {
 
 	if r.Protocol == "nvmeoroce" {
+		seen := map[string]bool{}
+		uniquePortals := make([]string, 0)
 		for _, portals := range ipsByArrayInitiator {
 			for _, portal := range portals {
-				// Use 'rdma' as the transport for RoCE, as it's the more common and lab-verified value
-				logger.Debugf("NVMe/RoCE discover and connect on portal: {%s}", portal)
-				args := []string{"discover", "-t", "rdma", "-a", portal}
-				_, err := r.Executer.ExecuteWithTimeout(30000, "nvme", args)
-				if err != nil {
-					logger.Errorf("Failed to discover NVMe/RoCE on portal %s: %v", portal, err)
+				if portal == "" || seen[portal] {
 					continue
 				}
+				seen[portal] = true
+				uniquePortals = append(uniquePortals, portal)
+			}
+		}
 
-				// After discovery, connect-all is often used to establish sessions to all discovered controllers
-				args = []string{"connect-all", "-t", "rdma", "-a", portal}
-				_, err = r.Executer.ExecuteWithTimeout(30000, "nvme", args)
-				if err != nil {
-					logger.Errorf("Failed to connect-all NVMe/RoCE on portal %s: %v", portal, err)
-				}
+		successfulConnections := 0
+		for _, portal := range uniquePortals {
+			// Use 'rdma' as the transport for RoCE, as it's the more common and lab-verified value.
+			logger.Debugf("NVMe/RoCE discover and connect on portal: {%s}", portal)
+			args := []string{"discover", "-t", "rdma", "-a", portal}
+			_, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", args)
+			if err != nil {
+				logger.Errorf("Failed to discover NVMe/RoCE on portal %s: %v", portal, err)
+				continue
+			}
+
+			// connect-all establishes sessions to discovered controllers behind this portal.
+			args = []string{"connect-all", "-t", "rdma", "-a", portal}
+			_, err = r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", args)
+			if err != nil {
+				logger.Errorf("Failed to connect-all NVMe/RoCE on portal %s: %v", portal, err)
+				continue
+			}
+
+			successfulConnections++
+			if successfulConnections >= nvmeRoceTargetConnections {
+				logger.Debugf("NVMe/RoCE reached %d successful portal connections, stopping further login attempts", successfulConnections)
+				break
 			}
 		}
 		return

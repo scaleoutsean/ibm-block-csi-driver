@@ -48,6 +48,14 @@ class InterfacesResource(ResourceBase):
         seen = set()
 
         for interface in self._get("/interfaces", params={"channelType": "hostside"}):
+            link_status = (
+                (((interface.get("ioInterfaceTypeData") or {}).get("ethernet") or {}).get("interfaceData") or {})
+                .get("ethernetData", {})
+                .get("linkStatus")
+            )
+            if link_status and link_status != "up":
+                continue
+
             proto_list = interface.get("commandProtocolPropertiesList") or {}
             proto_props = proto_list.get("commandProtocolProperties") or []
             for prop in proto_props:
@@ -60,9 +68,18 @@ class InterfacesResource(ResourceBase):
                     if not transport_props:
                         continue
 
+                    ipv4_enabled = transport_props.get("ipv4Enabled")
+                    if ipv4_enabled is False:
+                        continue
+
                     ipv4_data = transport_props.get("ipv4Data") or {}
+                    ipv4_address_data = ipv4_data.get("ipv4AddressData") or {}
+                    config_state = ipv4_address_data.get("configState")
+                    if config_state and config_state != "configured":
+                        continue
+
                     ipv4_address = ipv4_data.get("ipv4Address") or (
-                        (ipv4_data.get("ipv4AddressData") or {}).get("ipv4Address")
+                        ipv4_address_data.get("ipv4Address")
                     )
                     if not ipv4_address or ipv4_address == "0.0.0.0":
                         continue
