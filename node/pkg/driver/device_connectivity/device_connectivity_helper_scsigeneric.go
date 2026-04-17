@@ -944,6 +944,15 @@ func (GetDmsPathHelperGeneric) GetMpathDeviceNameFromProcMounts(procMounts strin
 		if strings.Contains(procMountLine, volumePath) {
 			return extractMpathDeviceName(procMountLine), nil
 		}
+
+		// If volumePath starts with /host, Kubernetes might have mounted it without the prefix on the host OS
+		// so /proc/mounts might show it without the /host prefix. Check for that.
+		if strings.HasPrefix(volumePath, "/host/") {
+			unprefixedPath := strings.TrimPrefix(volumePath, "/host")
+			if strings.Contains(procMountLine, unprefixedPath) {
+				return extractMpathDeviceName(procMountLine), nil
+			}
+		}
 	}
 	return "", &MultipathDeviceNotFoundForVolumePathError{volumePath}
 }
