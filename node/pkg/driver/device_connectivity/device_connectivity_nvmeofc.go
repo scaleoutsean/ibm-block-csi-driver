@@ -444,8 +444,20 @@ func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(volumeId string, lun int, ar
 		logger.Warningf("Error while searching for native NVMe device by WWID: %v", err)
 	}
 
-	// Fallback to legacy multipath behavior
-	return r.HelperScsiGeneric.GetMpathDevice(volumeId)
+	// Preference 3: Wildcard by-id glob on namespace number (lun == NVMe namespace ID).
+	// Does not depend on array serial and is stable as long as the namespace ID is fixed.
+	if lun >= 0 {
+		pattern := fmt.Sprintf("/dev/disk/by-id/nvme-*_%d", lun)
+		matches, globErr := r.Executer.FilepathGlob(pattern)
+		if globErr == nil && len(matches) > 0 {
+			logger.Infof("Found NVMe device via namespace-id glob %s -> %s", pattern, matches[0])
+			return matches[0], nil
+		}
+		logger.Warningf("Namespace-id glob %s found no matches", pattern)
+	}
+
+	// ANA does not create DM devices; do not fall through to multipath.
+	return "", fmt.Errorf("NVMe device not found for volume %s (lun %d) — device may not yet be visible", volumeId, lun)
 }
 
 func (r OsDeviceConnectivityNvmeOFc) FlushMultipathDevice(mpathDevice string) error {
