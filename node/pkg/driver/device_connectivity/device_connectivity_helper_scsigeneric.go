@@ -274,6 +274,25 @@ func isNvmeDevice(dmPath string, executer executer.ExecuterInterface) bool {
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (string, error) {
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] ", volumeId)
 
+	// Quick check for native NVMe devices to avoid 5-second DM multipath timeouts
+	uniqueId := volumeId
+	if len(volumeId) > 8 && (strings.HasPrefix(volumeId, "02000000") || strings.HasPrefix(volumeId, "03000000")) {
+		uniqueId = volumeId[8:]
+	}
+	if files, err := r.Executer.FilepathGlob("/sys/block/nvme*n*"); err == nil {
+		for _, f := range files {
+			if content, err := r.Executer.IoutilReadFile(filepath.Join(f, "wwid")); err == nil {
+				wwid := strings.ToLower(strings.TrimSpace(string(content)))
+				lUnique := strings.ToLower(uniqueId)
+				if strings.Contains(wwid, lUnique) || strings.Contains(lUnique, wwid) {
+					devicePath := filepath.Join("/dev", filepath.Base(f))
+					logger.Infof("GetMpathDevice: Found native NVMe device %s for volume %s, bypassing multipath search", devicePath, volumeId)
+					return devicePath, nil
+				}
+			}
+		}
+	}
+
 	volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeId)
 	dmPath, _ := r.Helper.GetDmsPath(volumeIdVariations)
 

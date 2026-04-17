@@ -650,12 +650,16 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 	// Unmount and delete mount point file/folder
 	logger.Debugf("Check if target %s is mounted", targetPathWithHostPrefix)
-	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPathWithHostPrefix)
-	if err != nil {
-		logger.Errorf("Check is target mounted failed. Target : %q, err : %v", targetPathWithHostPrefix, err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	if !isNotMounted {
+
+	for i := 0; i < 3; i++ {
+		isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPathWithHostPrefix)
+		if err != nil {
+			logger.Errorf("Check is target mounted failed. Target : %q, err : %v", targetPathWithHostPrefix, err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		if isNotMounted {
+			break
+		}
 		err = d.Mounter.Unmount(target)
 		if err != nil && strings.Contains(strings.ToLower(err.Error()), "no such file or directory") {
 			targetPathWithHostPrefix := d.NodeUtils.GetPodPath(target)
@@ -666,8 +670,9 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 			logger.Errorf("Unmount failed. Target : %q, err : %v", target, err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
 		}
+		logger.Debugf("Unmount finished. Target : {%s}", target)
 	}
-	logger.Debugf("Unmount finished. Target : {%s}", target)
+
 	if err = d.NodeUtils.RemoveFileOrDirectory(targetPathWithHostPrefix); err != nil {
 		logger.Errorf("Failed to remove mount path file/directory. Target %s: %v", targetPathWithHostPrefix, err)
 		return nil, status.Error(codes.Internal, err.Error())
