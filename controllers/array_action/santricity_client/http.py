@@ -11,7 +11,7 @@ from requests import Response, Session
 from .exceptions import RequestError, UnexpectedResponseError
 
 
-@dataclass
+@dataclass(slots=True)
 class HttpResponse:
     """Typed response wrapper with helper accessors."""
 

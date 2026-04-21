@@ -234,3 +234,40 @@ class SANtricityClient:
         return self._client.request("GET", "/host-types")
 
 
+
+
+    def create_snapshot_group(self, volume_id, name, percent_capacity=20):
+        candidates = self._client.snapshots.get_repo_group_candidates_single(
+            base_volume_ref=volume_id,
+            percent_capacity=percent_capacity,
+            concat_volume_type="snapshotGroup"
+        )
+        if not candidates:
+            raise Exception("No repository candidates found for volume {}".format(volume_id))
+        
+        payload = {
+            "baseMappableObjectId": volume_id,
+            "name": name,
+            "repositoryCandidate": candidates[0]
+        }
+        return self._client.snapshots.create_group(payload)
+
+    def list_snapshot_groups(self):
+        return self._client.snapshots.list_groups()
+
+    def get_snapshot_group(self, group_id):
+        # The library list_groups returns all, we filter
+        groups = self._client.snapshots.list_groups()
+        for g in groups:
+            if g.get("id") == group_id or g.get("pitGroupRef") == group_id:
+                return g
+        return None
+
+    def delete_snapshot_group(self, group_id):
+        return self._client.snapshots.delete_group(group_id)
+
+    def list_snapshot_images(self, group_id):
+        return self._client.snapshots.list_images(group_id)
+
+    def create_snapshot_image(self, group_id):
+        return self._client.snapshots.create_image(group_id)

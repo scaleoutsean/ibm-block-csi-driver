@@ -11,12 +11,14 @@ import requests
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
 
+from .automation import AutomationFacade
 from .auth.base import AuthStrategy
 from .capabilities import CapabilityProfile, resolve_capabilities
 from .config import ClientConfig
 from .exceptions import AuthenticationError, RequestError
 from .http import HttpResponse
 from .http import request as http_request
+from .reports import ReportsFacade
 from .resources import (
     ClonesResource,
     HostsResource,
@@ -75,6 +77,8 @@ class SANtricityClient:
         self.mappings = VolumeMappingsResource(self)
         self.clones = ClonesResource(self)
         self.system = SystemResource(self)
+        self.reports = ReportsFacade(self)
+        self.automation = AutomationFacade(self)
 
     # Context manager helpers -------------------------------------------------
     def __enter__(self) -> SANtricityClient:
@@ -84,6 +88,25 @@ class SANtricityClient:
         self.close()
 
     # Public API --------------------------------------------------------------
+    @property
+    def system_id(self) -> str:
+        """Return the active storage-system identifier.
+
+        If no system id was provided at construction time, this triggers
+        one-time auto-discovery via ``GET /storage-systems``.
+        """
+
+        return self._get_system_id()
+
+    @system_id.setter
+    def system_id(self, value: str) -> None:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("system_id cannot be empty")
+        self._system_id = normalized
+        self.config.system_id = normalized
+        self._scoped_prefix_cache = None
+
     def request(
         self,
         method: str,
@@ -111,203 +134,9 @@ class SANtricityClient:
         return response.data
 
     def mappings_report(self) -> list[dict[str, Any]]:
-        """Return a best-effort human-friendly view of volume mappings.
+        """Return a best-effort human-friendly view of volume mappings."""
 
-        This method performs the following calls (best-effort order):
-        - GET /volumes
-        - GET /storage-pools
-        - GET /hosts
-        - GET /host-groups
-        - GET /volume-mappings
-
-        The returned mapping rows are shallow copies of the mapping objects
-        augmented with additional keys that are useful for human consumption
-        and for the CLI table rendering (for example: `mappableObjectName`,
-        `poolName`, `poolFreeSpace`, `hostLabel`, `hostGroup`).
-        """
-        vols = self.volumes.list() or []
-        pools = self.pools.list() or []
-        hosts = self.hosts.list() or []
-        host_groups = self.hosts.list_groups() or []
-        mappings = self.mappings.list() or []
-
-        # Build quick lookup maps by common identifier fields. Map multiple
-        # identifier keys to the same object so different payload shapes
-        # (present in different SANtricity releases) resolve correctly.
-        vol_by_id: dict[str, dict[str, Any]] = {}
-        for v in vols:
-            candidates = (
-                v.get("volumeRef"),
-                v.get("id"),
-                v.get("mappableObjectId"),
-                v.get("mappableObjectRef"),
-            )
-            for cand in candidates:
-                if cand:
-                    vol_by_id.setdefault(str(cand), v)
-
-        pool_by_id: dict[str, dict[str, Any]] = {}
-        for p in pools:
-            candidates = (
-                p.get("id"),
-                p.get("volumeGroupRef"),
-                p.get("volumeGroupId"),
-                p.get("volumeGroupRef"),
-            )
-            for cand in candidates:
-                if cand:
-                    pool_by_id.setdefault(str(cand), p)
-
-        host_by_ref: dict[str, dict[str, Any]] = {}
-        for h in hosts:
-            candidates = (h.get("hostRef"), h.get("id"), h.get("clusterRef"))
-            for cand in candidates:
-                if cand:
-                    host_by_ref.setdefault(str(cand), h)
-
-        group_by_cluster: dict[str, dict[str, Any]] = {}
-        for g in host_groups:
-            candidates = (g.get("clusterRef"), g.get("id"))
-            for cand in candidates:
-                if cand:
-                    group_by_cluster.setdefault(str(cand), g)
-
-        result: list[dict[str, Any]] = []
-        for m in mappings:
-            row: dict[str, Any] = dict(m)
-
-            # Resolve volume info
-            vid = (
-                m.get("volumeRef")
-                or m.get("mappableObjectId")
-                or m.get("mappableObjectRef")
-                or m.get("mappableObject")
-            )
-            if vid:
-                vol = vol_by_id.get(str(vid))
-                if vol:
-                    vol_name = vol.get("name") or vol.get("label")
-                    if not vol_name:
-                        for fallback_key in (
-                            "volumeName",
-                            "mappableObjectName",
-                            "mappableObjectLabel",
-                        ):
-                            candidate = vol.get(fallback_key)
-                            if candidate:
-                                vol_name = candidate
-                                break
-                    if vol_name:
-                        row.setdefault("mappableObjectName", vol_name)
-                    # common capacity keys
-                    for cap_key in ("capacity", "reportedSize", "currentVolumeSize"):
-                        if cap_key in vol and vol.get(cap_key) is not None:
-                            row.setdefault("capacity", vol.get(cap_key))
-                            break
-                    # pool lookup
-                    pool_id = (
-                        vol.get("volumeGroupRef") or vol.get("poolId") or vol.get("storagePoolId")
-                    )
-                    if pool_id:
-                        pool = pool_by_id.get(str(pool_id))
-                        if pool:
-                            pool_name = pool.get("label") or pool.get("name")
-                            if not pool_name:
-                                for pool_key in ("volumeGroupLabel", "volumeGroupName"):
-                                    candidate = pool.get(pool_key)
-                                    if candidate:
-                                        pool_name = candidate
-                                        break
-                            if pool_name:
-                                row.setdefault("poolName", pool_name)
-                            if pool.get("freeSpace") is not None:
-                                row.setdefault("poolFreeSpace", pool.get("freeSpace"))
-                            # RAID level best-effort
-                            raid = pool.get("raidLevel")
-                            if not raid:
-                                extents = pool.get("extents")
-                                if isinstance(extents, (list, tuple)) and extents:
-                                    first = extents[0]
-                                    if isinstance(first, Mapping):
-                                        raid = first.get("raidLevel")
-                            if raid:
-                                row.setdefault("raidLevel", raid)
-
-            # Resolve mapping target (host or host-group)
-            candidate_targets = (
-                m.get("targetId"),
-                m.get("clusterRef"),
-                m.get("hostRef"),
-                m.get("hostGroup"),
-                m.get("mapRef"),
-            )
-            best_target_label: str | None = None
-            target_resolved = False
-            for candidate in candidate_targets:
-                if not candidate:
-                    continue
-                key = str(candidate)
-                host_obj = host_by_ref.get(key)
-                if host_obj:
-                    host_label = host_obj.get("label") or host_obj.get("name")
-                    if not host_label:
-                        for host_key in ("hostLabel", "hostName"):
-                            candidate_label = host_obj.get(host_key)
-                            if candidate_label:
-                                host_label = candidate_label
-                                break
-                    if host_label:
-                        row.setdefault("hostLabel", host_label)
-                        best_target_label = host_label
-                    row.setdefault("hostRef", host_obj.get("hostRef") or host_obj.get("id"))
-                    target_resolved = True
-                    break
-                group_obj = group_by_cluster.get(key)
-                if group_obj:
-                    group_label = group_obj.get("label") or group_obj.get("name")
-                    if not group_label:
-                        for group_key in ("hostGroupLabel", "clusterName"):
-                            candidate_label = group_obj.get(group_key)
-                            if candidate_label:
-                                group_label = candidate_label
-                                break
-                    if group_label:
-                        row.setdefault("hostGroup", group_label)
-                        best_target_label = group_label
-                    row.setdefault("clusterRef", group_obj.get("clusterRef") or group_obj.get("id"))
-                    target_resolved = True
-                    break
-
-            if not target_resolved:
-                for candidate in candidate_targets:
-                    if candidate:
-                        best_target_label = str(candidate)
-                        break
-
-            if not best_target_label:
-                for fallback_key in (
-                    "targetLabel",
-                    "targetName",
-                    "hostGroupLabel",
-                    "clusterName",
-                    "hostLabel",
-                ):
-                    candidate = row.get(fallback_key)
-                    if candidate:
-                        best_target_label = str(candidate)
-                        break
-
-            if best_target_label:
-                row.setdefault("targetLabel", best_target_label)
-
-            # Provide a normalized mapping id for display
-            map_id = m.get("mapRef") or m.get("mappingRef") or m.get("id") or m.get("lunMappingRef")
-            if map_id:
-                row.setdefault("mappingRef", map_id)
-
-            result.append(row)
-
-        return result
+        return self.reports.mappings()
 
     def close(self) -> None:
         self._session.close()
@@ -338,11 +167,6 @@ class SANtricityClient:
         system_id = self._get_system_id()
         self._scoped_prefix_cache = f"/storage-systems/{system_id}"
         return self._scoped_prefix_cache
-
-    @property
-    def system_id(self) -> str:
-        """Public accessor for the storage system identifier."""
-        return self._get_system_id()
 
     def _get_system_id(self) -> str:
         if self._system_id:

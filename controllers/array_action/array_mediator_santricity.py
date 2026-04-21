@@ -375,8 +375,7 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         # For SANtricity, we use space_efficiency as RAID level hint
         return space_efficiency.lower() in ['raid1', 'raid5', 'raid6', 'raid10', 'none']
 
-    def get_snapshot(self, volume_id, snapshot_name, pool, is_virt_snap_func):
-        raise NotImplementedError()
+
 
     def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
         if object_type == servers_settings.VOLUME_TYPE_NAME:
@@ -389,20 +388,22 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
                 return None
         return None
 
-    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func, partition_name=None):
-        raise NotImplementedError()
 
-    def delete_snapshot(self, snapshot_id, internal_snapshot_id, partition_name=None):
-        raise NotImplementedError()
 
-    def get_array_fc_wwns(self, host_name):
-        return []
+def _to_snapshot_object(self, group_data, volume_data=None):
+        return Snapshot(
+            capacity_bytes=int(volume_data['capacity']) if volume_data else 0,
+            id=group_data['id'],
+            internal_id=group_data['id'],
+            name=group_data['name'],
+            array_address=self.endpoint,
+            source_id=group_data['baseVolume'],
+            array_type=self.array_type,
+            pool=group_data.get('pitGroupRef', ''),
+            is_ready=True
+        )
 
-    def get_replication(self, replication_request):
-        return None
 
-    def create_replication(self, replication_request):
-        raise NotImplementedError()
 
     def delete_replication(self, replication):
         raise NotImplementedError()

@@ -12,10 +12,6 @@ from .base import ResourceBase
 class SystemResource(ResourceBase):
     """Expose utility endpoints for release detection."""
 
-    def get_info(self) -> dict[str, Any]:
-        """Return the storage-system metadata (includes chassisSerialNumber)."""
-        return self._get("/", system_scope=True)
-
     def build_info(self) -> dict[str, Any]:
         """Return the /utils/buildinfo payload."""
 

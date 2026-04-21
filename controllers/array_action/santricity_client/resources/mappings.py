@@ -66,6 +66,18 @@ class VolumeMappingsResource(ResourceBase):
 
         return self._client.request("POST", path, json_payload=payload)
 
+    def delete(self, map_ref: str) -> dict[str, Any]:
+        """Remove a volume mapping."""
+        profile = self._client.capabilities
+        path = f"{profile.mapping_endpoint}/{map_ref}"
+        fallback_path = f"{profile.legacy_mapping_endpoint}/{map_ref}" if profile.legacy_mapping_endpoint else None
+
+        return self._request_with_fallback(
+            "DELETE",
+            path,
+            fallback_path=fallback_path,
+        )
+
     def _resolve_target_id(
         self,
         *,

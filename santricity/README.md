@@ -32,6 +32,7 @@ These are the capabilities the driver explicitly reports to Kubernetes during th
     - CONTROLLER_SERVICE
     - VolumeExpansion: ONLINE
 - Supported Connectivity Protocols
+
 The protocols supported by the driver (iSCSI, FC, NVMe) are defined in the configuration and implemented via the storage mediators:
 - Connectivity protocols - iscsi, fc, nvme_over_fc, and our new nvme_over_roce
 
@@ -73,6 +74,37 @@ kubectl apply -f ./deploy/santricity-solidfire/csi.ibm.com_v1_ibmblockcsi_cr.yam
 ```
 
 You can test installation flow without an attached E-Series array. The operator, CRDs, and CSI workloads should deploy. Volume provisioning will fail until `secret-santricity.yaml` points to a reachable array.
+
+### Snapshot Support
+
+For snapshot provisioning and deletion to work, make sure that Kubernetes external snapshotter CRDs, Snapshot Controller, and an appropriate `VolumeSnapshotClass` are installed in your cluster.
+
+A minimal `VolumeSnapshotClass` for SANtricity arrays should look like this:
+
+```yaml
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: demo-volumesnapshotclass
+driver: santricity.block.csi.ibm.com # different from IBM's driver name
+deletionPolicy: Delete
+parameters:
+  csi.storage.k8s.io/snapshotter-secret-name: demo-secret
+  csi.storage.k8s.io/snapshotter-secret-namespace: default
+```
+
+You can then create snapshots by referencing this class:
+
+```yaml
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: demo-volumesnapshot
+spec:
+  volumeSnapshotClassName: demo-volumesnapshotclass
+  source:
+    persistentVolumeClaimName: demo-pvc-file-system
+```
 
 ## Call Home and Privacy
 

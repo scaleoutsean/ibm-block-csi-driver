@@ -19,7 +19,7 @@ class PoolsResource(ResourceBase):
         return self._get(f"/storage-pools/{pool_ref}")
 
     def get_by_name(self, name: str) -> dict[str, Any] | None:
-        """Find a storage pool by its name or label.
+        """Find a storage pool ID by its name or label.
 
         Args:
             name: The name or label of the storage pool.
