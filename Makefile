@@ -24,7 +24,7 @@ LDFLAGS?="-X ${PKG}/node/pkg/driver.gitCommit=${GIT_COMMIT} -X ${PKG}/node/pkg/d
 GO111MODULE=on
 DRIVER_CONFIG_YML=$(shell pwd)/common/config.yaml
 SANTRICITY_CLIENT_REPO?=https://github.com/scaleoutsean/santricity-client
-SANTRICITY_CLIENT_REF?=0.2.0
+SANTRICITY_CLIENT_REF?=0.2.1
 # -race is not supported on Z
 GO_TEST_FLAGS=$(shell if [ "$$(uname -m)" = "s390x" ]; then echo "-v"; else echo "-v -race"; fi)
 
@@ -84,6 +84,8 @@ vendor-santricity:
 	git clone --depth 1 --branch $(SANTRICITY_CLIENT_REF) $(SANTRICITY_CLIENT_REPO) /tmp/santricity-client
 	cp -r /tmp/santricity-client/src/santricity_client controllers/array_action/
 	rm -rf /tmp/santricity-client
+	@echo ">> Patching python 3.9 dataclass compatibility..."
+	find controllers/array_action/santricity_client -type f -name "*.py" -exec sed -i 's/@dataclass(slots=True)/@dataclass/g' {} +
 	@echo ">> santricity-client vendored successfully"
 
 .PHONY: csi-build-images-and-push-artifactory
