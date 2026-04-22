@@ -232,17 +232,31 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         raise array_errors.HostNotFoundError(str(initiators))
 
     def _get_array_initiators(self, host_name, connectivity_type):
+        from controllers.array_action.santricity_client.reports.interfaces_report import hostside_interfaces_report
         initiators = {}
         if connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
             target_settings = self.client.get_iscsi_target_settings()
             iqn = target_settings.get('nodeName')
-            portals = [p.get('address') for p in target_settings.get('portals', [])]
+            
+            interfaces = hostside_interfaces_report(self.client, protocol="iscsi")
+            portals = [i['ipv4_address'] for i in interfaces if i.get('is_link_up') and i.get('is_ipv4_enabled') and i.get('ipv4_address')]
+            
             if iqn:
                 initiators[iqn] = portals
         elif connectivity_type == array_settings.NVME_OVER_ROCE_CONNECTIVITY_TYPE:
             target_settings = self.client.get_nvme_target_settings()
             nqn = target_settings.get('nodeName')
-            portals = [p.get('address') for p in target_settings.get('portals', [])]
+            
+            interfaces = hostside_interfaces_report(self.client, protocol="ethernet")
+            portals = [
+                i['command_ipv4_address'] 
+                for i in interfaces 
+                if i.get('command_protocol') == 'nvme' 
+                and i.get('is_link_up') 
+                and i.get('is_command_ipv4_ready') 
+                and i.get('command_ipv4_address')
+            ]
+            
             if nqn:
                 initiators[nqn] = portals
             
