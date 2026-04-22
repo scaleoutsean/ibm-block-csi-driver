@@ -142,6 +142,26 @@ Remember to update, and then apply the secret file:
 
 ```sh
 kubectl apply -f ./deploy/santricity-solidfire/secret-santricity.yaml
+
+### Kubernetes PVC Metadata tags
+
+The IBM block CSI driver orchestrates Volume provisioning metadata by converting `csi.storage.k8s.io/*` keys (like `pvc_name` and `pvc_namespace`) into SANtricity volume Metadata tags. This drastically helps track K8s volume objects (like `csi_AdNDmArncUqCAG842z1H4Lj4xc`) to their native Kubernetes PVC names.
+
+However, the `csi-provisioner` sidecar drops these PVC keys before passing the provisioning request to the CSI driver unless it runs with the `--extra-create-metadata=true` startup argument.
+
+Because this driver is tightly managed by the IBM Block CSI Operator (`ibm-block-csi-operator.yaml`), the custom resource `csi.ibm.com_v1_ibmblockcsi_cr.yaml` strictly limits the configurable sidecar fields to only `imagePullPolicy`, `name`, `repository`, and `tag`. It does **not** support injecting custom `args` per the schema definition.
+
+To enable natively visible PVC names on your SANtricity array, you must scale the operator down and manually patch the provisionser sidecar:
+
+```sh
+# 1. Stop the operator from reverting your manual changes
+kubectl scale deployment ibm-block-csi-operator-controller-manager --replicas=0
+
+# 2. Edit the deployed CSI controller StatefulSet
+kubectl edit statefulset ibm-block-csi-controller
+
+# 3. Add `--extra-create-metadata=true` to the `csi-provisioner` container args array
+```
 ```
 
 ## Storage Configuration
