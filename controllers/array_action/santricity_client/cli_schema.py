@@ -476,7 +476,7 @@ CLI_TABLE_VIEWS: dict[str, TableView] = {
             Column("Transport", keys=("transport",)),
             Column("Addr", keys=("ipv4_address", "infiniband_ipv4_address", "roce_v2_ipv4_address")),
             Column("Cmd IPv4", keys=("command_ipv4_address",)),
-            Column("Ready", keys=("is_command_ipv4_ready",), formatter=_bool_formatter, justify="center"),
+            Column("NVMe Ready", keys=("is_command_ipv4_ready",), formatter=_bool_formatter, justify="center"),
             Column("Provider", keys=("command_provider",), formatter=_truncate_formatter(max_chars=18)),
         ),
         sort_key=lambda row: (
@@ -493,7 +493,7 @@ CLI_TABLE_VIEWS: dict[str, TableView] = {
             Column("Model", keys=("model_name",), formatter=_truncate_formatter(max_chars=18)),
             Column("Status", keys=("status",)),
             Column("Ifaces", keys=("hostside_interface_count",), justify="right"),
-            Column("Cmd Ready", extractor=_hostside_ready_summary, justify="center"),
+            Column("NVMe Ready", extractor=_hostside_ready_summary, justify="center"),
             Column("Protocols", extractor=_hostside_protocol_summary, formatter=_truncate_formatter(max_chars=22)),
         ),
         sort_key=lambda row: str(row.get("physical_location_label") or row.get("id") or row.get("controller_ref") or "").lower(),

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from .base import AuthStrategy
 
 
-@dataclass(slots=True)
+@dataclass
 class JWTAuth(AuthStrategy):
     """Apply an already issued bearer token."""
 

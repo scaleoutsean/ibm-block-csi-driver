@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from .base import AuthStrategy
 
 
-@dataclass(slots=True)
+@dataclass
 class BasicAuth(AuthStrategy):
     """Apply HTTP Basic auth headers."""
 

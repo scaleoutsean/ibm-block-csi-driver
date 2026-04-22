@@ -9,7 +9,7 @@ from dataclasses import dataclass
 VersionTuple = tuple[int, int, int]
 
 
-@dataclass(slots=True)
+@dataclass
 class CapabilityProfile:
     """Represents the feature surface supported by a SANtricity release family."""
 
@@ -33,27 +33,27 @@ _BASE_PROFILES: Sequence[CapabilityProfile] = (
         min_version=(11, 80, 0),
         supports_jwt=False,
         mapping_endpoint="/volume-mappings",
-        legacy_mapping_endpoint="/volume-mappings",
+        legacy_mapping_endpoint=None,
         clone_endpoint="/volume-clones",
-        legacy_clone_endpoint="/volume-clones",
+        legacy_clone_endpoint=None,
     ),
     CapabilityProfile(
         label="11.90",
         min_version=(11, 90, 0),
         supports_jwt=True,
         mapping_endpoint="/volume-mappings",
-        legacy_mapping_endpoint="/volume-mappings",
+        legacy_mapping_endpoint=None,
         clone_endpoint="/volume-clones",
-        legacy_clone_endpoint="/volume-clones",
+        legacy_clone_endpoint=None,
     ),
     CapabilityProfile(
         label="12.00",
         min_version=(12, 0, 0),
         supports_jwt=True,
-        mapping_endpoint="/v2/volume-mappings",
-        legacy_mapping_endpoint="/volume-mappings",
-        clone_endpoint="/v2/volume-clones",
-        legacy_clone_endpoint="/volume-clones",
+        mapping_endpoint="/volume-mappings",
+        legacy_mapping_endpoint=None,
+        clone_endpoint="/volume-clones",
+        legacy_clone_endpoint=None,
     ),
 )
 

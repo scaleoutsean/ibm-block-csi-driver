@@ -12,6 +12,23 @@ from .base import ResourceBase
 class SystemResource(ResourceBase):
     """Expose utility endpoints for release detection."""
 
+    def get_info(self) -> dict[str, Any]:
+        """Return storage-system metadata (including chassisSerialNumber when available)."""
+
+        payload = self._client.request("GET", "/storage-systems", system_scope=False)
+        if isinstance(payload, dict):
+            return payload
+        if not isinstance(payload, list):
+            raise RequestError("Unexpected /storage-systems payload shape; expected list or object.")
+
+        system_id = self._client.system_id
+        selected = self._select_system_payload(payload, system_id)
+        if selected is None:
+            raise RequestError(
+                f"Unable to find storage-system metadata for system id '{system_id}'."
+            )
+        return selected
+
     def build_info(self) -> dict[str, Any]:
         """Return the /utils/buildinfo payload."""
 
@@ -117,6 +134,22 @@ class SystemResource(ResourceBase):
             if isinstance(value, str) and value.strip():
                 return value, key
         return None, None
+
+    @staticmethod
+    def _select_system_payload(
+        payload: list[dict[str, Any] | Any], system_id: str
+    ) -> dict[str, Any] | None:
+        normalized = system_id.strip()
+        first_entry: dict[str, Any] | None = None
+        for entry in payload:
+            if not isinstance(entry, dict):
+                continue
+            if first_entry is None:
+                first_entry = entry
+            entry_id = entry.get("wwn") or entry.get("id")
+            if isinstance(entry_id, str) and entry_id.strip() == normalized:
+                return entry
+        return first_entry
 
 
 __all__ = ["SystemResource"]
