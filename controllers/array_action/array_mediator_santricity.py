@@ -461,10 +461,16 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
 
     def get_snapshot(self, volume_id, snapshot_name, pool=None, is_virt_snap_func=False):
         groups = self.client.list_snapshot_groups()
+        
+        # generate the likely short suffix for our custom name format
+        suffix = snapshot_name[-4:] if len(snapshot_name) >= 4 else snapshot_name
+        
         for g in groups:
-            if g.get("name") == snapshot_name and g.get("baseVolume") == volume_id:
-                vol_data = self.client.get_volume(volume_id)
-                return self._to_snapshot_object(g, vol_data)
+            if g.get("baseVolume") == volume_id:
+                g_name = g.get("name", "")
+                if g_name == snapshot_name or g_name.endswith(f"_{suffix}"):
+                    vol_data = self.client.get_volume(volume_id)
+                    return self._to_snapshot_object(g, vol_data)
         return None
 
     def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func, partition_name=None):
@@ -477,10 +483,18 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         if existing:
             return existing
             
+        vol_data = self.client.get_volume(volume_id)
+        if not vol_data:
+            raise array_errors.ObjectNotFoundError(volume_id)
+            
+        vol_name = vol_data.get("name", "unknown")
+        suffix = snapshot_name[-4:] if len(snapshot_name) >= 4 else snapshot_name
+        group_name = f"{vol_name[:24]}_{suffix}"
+        
         # Use our new auto_create_snapshot automation facade
         image_data = self.client._client.automation.snapshots.auto_create_snapshot(
             volume_ref=volume_id,
-            name=snapshot_name,
+            name=group_name,
             min_free_percent=10.0,
             growth_step_percent=10.0,
             auto_grow_if_needed=True,
@@ -520,78 +534,3 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
     def create_replication(self, replication):
         raise NotImplementedError()
 
-    def get_snapshot(self, volume_id, snapshot_name, pool=None, is_virt_snap_func=False):
-        groups = self.client.list_snapshot_groups()
-        for g in groups:
-            if g.get("name") == snapshot_name and g.get("baseVolume") == volume_id:
-                vol_data = self.client.get_volume(volume_id)
-                return self._to_snapshot_object(g, vol_data)
-        return None
-
-    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func, partition_name=None):
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"Creating snapshot '{snapshot_name}' for volume '{volume_id}'")
-        
-        # Check if already exists
-        existing = self.get_snapshot(volume_id, snapshot_name)
-        if existing:
-            return existing
-            
-        # Use our new auto_create_snapshot automation facade
-        image_data = self.client._client.automation.snapshots.auto_create_snapshot(
-            volume_ref=volume_id,
-            name=snapshot_name,
-            min_free_percent=10.0,
-            growth_step_percent=10.0,
-            auto_grow_if_needed=True,
-            include_schedule_owned_groups=True,
-            max_repo_group_capacity_percent=200.0,
-            max_repo_volumes_per_group=16,
-        )
-        
-        vol_data = self.client.get_volume(volume_id)
-        
-        # Return Snapshot object, we just need to grab the group data for `internal_id` 
-        # Wait, the image_data has `pitGroupRef`. Let's mock a group_data-like object out of image
-        group_ref = image_data.get("pitGroupRef")
-        group_data = {
-            "id": group_ref,
-            "name": snapshot_name,
-            "baseVolume": volume_id,
-            "pitGroupRef": group_ref
-        }
-        return self._to_snapshot_object(group_data, vol_data)
-
-
-
-    def delete_snapshot(self, snapshot_id, internal_snapshot_id, partition_name=None):
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"Deleting snapshot group: {snapshot_id}")
-        self.client.delete_snapshot_group(snapshot_id)
-
-    def get_volume_mappings(self, volume_id):
-        mappings = {}
-        all_mappings = self.client.list_volume_mappings()
-        # Use id or hostRef to match either flavor of REST API
-        # Need to collect labels from both individual hosts and host groups (clusters)
-        all_targets = {(h.get('id') or h.get('hostRef')): h['label'] for h in self.client.list_hosts()
-                        if h.get('id') or h.get('hostRef')}
-        try:
-            all_targets.update({(g.get('id') or g.get('clusterRef')): g['label'] 
-                                for g in self.client.list_host_groups()
-                                if g.get('id') or g.get('clusterRef')})
-        except Exception:
-            pass # Some API versions might only have /hosts or lack /host-groups
-        
-        for m in all_mappings:
-            vol_ref = m.get('volumeRef') or m.get('mappableObjectId')
-            if vol_ref == volume_id:
-                target_id = m.get('mapRef') or m.get('targetId')
-                target_name = all_targets.get(target_id, target_id)
-                mappings[target_name] = str(m['lun'])
-        return mappings
-    
-    def register_plugin(self, unique_key, metadata):
-        pass
