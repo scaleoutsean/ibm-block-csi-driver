@@ -477,13 +477,32 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         if existing:
             return existing
             
-        group_data = self.client.create_snapshot_group(volume_id, snapshot_name)
-        
-        # Ensure an image exists
-        self.client.create_snapshot_image(group_data['id'])
+        # Use our new auto_create_snapshot automation facade
+        image_data = self.client._client.automation.snapshots.auto_create_snapshot(
+            volume_ref=volume_id,
+            name=snapshot_name,
+            min_free_percent=10.0,
+            growth_step_percent=10.0,
+            auto_grow_if_needed=True,
+            include_schedule_owned_groups=True,
+            max_repo_group_capacity_percent=200.0,
+            max_repo_volumes_per_group=16,
+        )
         
         vol_data = self.client.get_volume(volume_id)
+        
+        # Return Snapshot object, we just need to grab the group data for `internal_id` 
+        # Wait, the image_data has `pitGroupRef`. Let's mock a group_data-like object out of image
+        group_ref = image_data.get("pitGroupRef")
+        group_data = {
+            "id": group_ref,
+            "name": snapshot_name,
+            "baseVolume": volume_id,
+            "pitGroupRef": group_ref
+        }
         return self._to_snapshot_object(group_data, vol_data)
+
+
 
     def delete_snapshot(self, snapshot_id, internal_snapshot_id, partition_name=None):
         import logging
@@ -519,13 +538,32 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         if existing:
             return existing
             
-        group_data = self.client.create_snapshot_group(volume_id, snapshot_name)
-        
-        # Ensure an image exists
-        self.client.create_snapshot_image(group_data['id'])
+        # Use our new auto_create_snapshot automation facade
+        image_data = self.client._client.automation.snapshots.auto_create_snapshot(
+            volume_ref=volume_id,
+            name=snapshot_name,
+            min_free_percent=10.0,
+            growth_step_percent=10.0,
+            auto_grow_if_needed=True,
+            include_schedule_owned_groups=True,
+            max_repo_group_capacity_percent=200.0,
+            max_repo_volumes_per_group=16,
+        )
         
         vol_data = self.client.get_volume(volume_id)
+        
+        # Return Snapshot object, we just need to grab the group data for `internal_id` 
+        # Wait, the image_data has `pitGroupRef`. Let's mock a group_data-like object out of image
+        group_ref = image_data.get("pitGroupRef")
+        group_data = {
+            "id": group_ref,
+            "name": snapshot_name,
+            "baseVolume": volume_id,
+            "pitGroupRef": group_ref
+        }
         return self._to_snapshot_object(group_data, vol_data)
+
+
 
     def delete_snapshot(self, snapshot_id, internal_snapshot_id, partition_name=None):
         import logging

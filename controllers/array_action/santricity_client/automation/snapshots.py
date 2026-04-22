@@ -207,7 +207,7 @@ class SnapshotsAutomation:
             group_payload = {
                 "baseMappableObjectId": volume_ref,
                 "name": name or "auto_snapshot_group",
-                "repositoryCandidate": candidates[0]
+                "repositoryCandidate": candidates[0].get("candidate")
             }
             group_data = self._client.snapshots.create_group(group_payload)
             resolved_group_ref = group_data["id"]
