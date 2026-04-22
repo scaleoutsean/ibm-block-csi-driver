@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 INDEXED_PATH_PART = re.compile(r"^(?P<key>[^\[\]]+)(?:\[(?P<index>\d+)\])?$")
 
 FieldTransform = Callable[[Any], Any]
-FieldMapping = tuple[str, str, FieldTransform | None]
+FieldMapping = tuple[str, str, Any]
 
 
 def _lower_string(value: Any) -> str | None:

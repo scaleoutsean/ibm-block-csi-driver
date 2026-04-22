@@ -8,7 +8,7 @@ from typing import Any
 from .interfaces_report import hostside_interfaces_report
 
 FieldTransform = Callable[[Any], Any]
-FieldMapping = tuple[str, str, FieldTransform | None]
+FieldMapping = tuple[str, str, Any]
 
 
 def _strip_string(value: Any) -> str | None:
