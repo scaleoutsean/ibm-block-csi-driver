@@ -240,7 +240,7 @@ class SANtricityClient:
         candidates = self._client.snapshots.get_repo_group_candidates_single(
             base_volume_ref=volume_id,
             percent_capacity=percent_capacity,
-            concat_volume_type="snapshotGroup"
+            concat_volume_type="snapshot"
         )
         if not candidates:
             raise Exception("No repository candidates found for volume {}".format(volume_id))
