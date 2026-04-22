@@ -435,6 +435,90 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
     def verify_volume_partition(self, volume, partition_name):
         return True
     
+
+    def get_array_fc_wwns(self, host_name):
+        return []
+
+    def get_replication(self, volume_id):
+        raise NotImplementedError()
+
+    def create_replication(self, replication):
+        raise NotImplementedError()
+
+    def get_snapshot(self, volume_id, snapshot_name, pool=None, is_virt_snap_func=False):
+        groups = self.client.list_snapshot_groups()
+        for g in groups:
+            if g.get("name") == snapshot_name and g.get("baseVolume") == volume_id:
+                vol_data = self.client.get_volume(volume_id)
+                return self._to_snapshot_object(g, vol_data)
+        return None
+
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func, partition_name=None):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Creating snapshot '{snapshot_name}' for volume '{volume_id}'")
+        
+        # Check if already exists
+        existing = self.get_snapshot(volume_id, snapshot_name)
+        if existing:
+            return existing
+            
+        group_data = self.client.create_snapshot_group(volume_id, snapshot_name)
+        
+        # Ensure an image exists
+        self.client.create_snapshot_image(group_data['id'])
+        
+        vol_data = self.client.get_volume(volume_id)
+        return self._to_snapshot_object(group_data, vol_data)
+
+    def delete_snapshot(self, snapshot_id, internal_snapshot_id, partition_name=None):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Deleting snapshot group: {snapshot_id}")
+        self.client.delete_snapshot_group(snapshot_id)
+
+
+    def get_array_fc_wwns(self, host_name):
+        return []
+
+    def get_replication(self, volume_id):
+        raise NotImplementedError()
+
+    def create_replication(self, replication):
+        raise NotImplementedError()
+
+    def get_snapshot(self, volume_id, snapshot_name, pool=None, is_virt_snap_func=False):
+        groups = self.client.list_snapshot_groups()
+        for g in groups:
+            if g.get("name") == snapshot_name and g.get("baseVolume") == volume_id:
+                vol_data = self.client.get_volume(volume_id)
+                return self._to_snapshot_object(g, vol_data)
+        return None
+
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func, partition_name=None):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Creating snapshot '{snapshot_name}' for volume '{volume_id}'")
+        
+        # Check if already exists
+        existing = self.get_snapshot(volume_id, snapshot_name)
+        if existing:
+            return existing
+            
+        group_data = self.client.create_snapshot_group(volume_id, snapshot_name)
+        
+        # Ensure an image exists
+        self.client.create_snapshot_image(group_data['id'])
+        
+        vol_data = self.client.get_volume(volume_id)
+        return self._to_snapshot_object(group_data, vol_data)
+
+    def delete_snapshot(self, snapshot_id, internal_snapshot_id, partition_name=None):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Deleting snapshot group: {snapshot_id}")
+        self.client.delete_snapshot_group(snapshot_id)
+
     def get_volume_mappings(self, volume_id):
         mappings = {}
         all_mappings = self.client.list_volume_mappings()
