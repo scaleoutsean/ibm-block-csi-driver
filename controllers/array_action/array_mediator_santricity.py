@@ -405,57 +405,57 @@ def _to_snapshot_object(self, group_data, volume_data=None):
 
 
 
-    def delete_replication(self, replication):
-        raise NotImplementedError()
+def delete_replication(self, replication):
+    raise NotImplementedError()
 
-    def promote_replication_volume(self, replication):
-        raise NotImplementedError()
+def promote_replication_volume(self, replication):
+    raise NotImplementedError()
 
-    def demote_replication_volume(self, replication):
-        raise NotImplementedError()
+def demote_replication_volume(self, replication):
+    raise NotImplementedError()
 
-    def add_io_group_to_host(self, host_name, io_group):
-        pass
+def add_io_group_to_host(self, host_name, io_group):
+    pass
 
-    def remove_io_group_from_host(self, host_name, io_group):
-        pass
+def remove_io_group_from_host(self, host_name, io_group):
+    pass
 
-    def get_host_io_group(self, host_name):
-        return ""
+def get_host_io_group(self, host_name):
+    return ""
 
-    def change_host_protocol(self, host_name, protocol):
-        pass
+def change_host_protocol(self, host_name, protocol):
+    pass
 
-    def verify_host_partition(self, host_name, new_partition_name):
-        return True
+def verify_host_partition(self, host_name, new_partition_name):
+    return True
 
-    def verify_volume_group_partition(self, volume_group, partition_name):
-        return True
+def verify_volume_group_partition(self, volume_group, partition_name):
+    return True
 
-    def verify_volume_partition(self, volume, partition_name):
-        return True
+def verify_volume_partition(self, volume, partition_name):
+    return True
 
-    def get_volume_mappings(self, volume_id):
-        mappings = {}
-        all_mappings = self.client.list_volume_mappings()
-        # Use id or hostRef to match either flavor of REST API
-        # Need to collect labels from both individual hosts and host groups (clusters)
-        all_targets = {(h.get('id') or h.get('hostRef')): h['label'] for h in self.client.list_hosts()
-                       if h.get('id') or h.get('hostRef')}
-        try:
-            all_targets.update({(g.get('id') or g.get('clusterRef')): g['label'] 
-                               for g in self.client.list_host_groups()
-                               if g.get('id') or g.get('clusterRef')})
-        except Exception:
-            pass # Some API versions might only have /hosts or lack /host-groups
-        
-        for m in all_mappings:
-            vol_ref = m.get('volumeRef') or m.get('mappableObjectId')
-            if vol_ref == volume_id:
-                target_id = m.get('mapRef') or m.get('targetId')
-                target_name = all_targets.get(target_id, target_id)
-                mappings[target_name] = str(m['lun'])
-        return mappings
+def get_volume_mappings(self, volume_id):
+    mappings = {}
+    all_mappings = self.client.list_volume_mappings()
+    # Use id or hostRef to match either flavor of REST API
+    # Need to collect labels from both individual hosts and host groups (clusters)
+    all_targets = {(h.get('id') or h.get('hostRef')): h['label'] for h in self.client.list_hosts()
+                    if h.get('id') or h.get('hostRef')}
+    try:
+        all_targets.update({(g.get('id') or g.get('clusterRef')): g['label'] 
+                            for g in self.client.list_host_groups()
+                            if g.get('id') or g.get('clusterRef')})
+    except Exception:
+        pass # Some API versions might only have /hosts or lack /host-groups
+    
+    for m in all_mappings:
+        vol_ref = m.get('volumeRef') or m.get('mappableObjectId')
+        if vol_ref == volume_id:
+            target_id = m.get('mapRef') or m.get('targetId')
+            target_name = all_targets.get(target_id, target_id)
+            mappings[target_name] = str(m['lun'])
+    return mappings
 
-    def register_plugin(self, unique_key, metadata):
-        pass
+def register_plugin(self, unique_key, metadata):
+    pass
