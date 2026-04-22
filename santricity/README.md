@@ -79,6 +79,13 @@ You can test installation flow without an attached E-Series array. The operator,
 
 For snapshot provisioning and deletion to work, make sure that Kubernetes external snapshotter CRDs, Snapshot Controller, and an appropriate `VolumeSnapshotClass` are installed in your cluster.
 
+Download "external snapshotter" and install the CRDs and controller:
+
+```sh
+kubectl apply -k ./external-snapshotter/client/config/crd/
+kubectl apply -k ./external-snapshotter/deploy/kubernetes/snapshot-controller
+```
+
 A minimal `VolumeSnapshotClass` for SANtricity arrays should look like this:
 
 ```yaml
