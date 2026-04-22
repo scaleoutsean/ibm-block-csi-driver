@@ -1,6 +1,6 @@
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
-from controllers.array_action.array_action_types import Volume, Host
+from controllers.array_action.array_action_types import Volume, Host, Snapshot
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.santricity_rest_client import SANtricityClient
 from controllers.array_action.utils import ClassProperty
