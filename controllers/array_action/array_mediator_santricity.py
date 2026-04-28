@@ -99,6 +99,13 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
                     meta_tags.append({"key": tag_key, "value": value})
             
         try:
+            # Handle Snapshot Restore (Linked Clone)
+            if source_type == servers_settings.SNAPSHOT_TYPE_NAME and source_ids:
+                snapshot_image_id = source_ids.uid if source_ids.uid else source_ids.internal_id
+                logger.info(f"Creating read-only snapshot volume {name} from snapshot image {snapshot_image_id}")
+                vol_data = self.client.create_snapshot_volume(name=name, snapshot_image_id=snapshot_image_id, view_mode="readOnly")
+                return self._to_volume_object(vol_data)
+
             # Use label=name in payload for Embedded REST API
             vol_data = self.client.create_volume(pool_id, name, size_in_bytes, raid_level=raid_level, 
                                                  meta_tags=meta_tags)
@@ -268,15 +275,18 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         return initiators
 
     def _to_volume_object(self, vol_data):
+        vol_id = vol_data.get('volumeRef') or vol_data.get('id') or vol_data.get('viewRef')
+        capacity = vol_data.get('capacity') or vol_data.get('viewCapacity') or 0
+        pool_id = vol_data.get('volumeGroupRef') or ''
         return Volume(
-            capacity_bytes=int(vol_data['capacity']),
-            id=vol_data['volumeRef'],
-            internal_id=vol_data['volumeRef'],
-            name=vol_data['label'],
+            capacity_bytes=int(capacity),
+            id=vol_id,
+            internal_id=vol_id,
+            name=vol_data.get('label') or vol_data.get('name', ''),
             array_address=self.endpoint,
             source_id=None,
             array_type=self.array_type,
-            pool=vol_data['volumeGroupRef']
+            pool=pool_id
         )
 
     def copy_to_existing_volume(self, volume_id, source_id, source_capacity_in_bytes, minimum_volume_size_in_bytes):

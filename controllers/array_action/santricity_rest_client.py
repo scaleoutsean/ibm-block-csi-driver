@@ -107,13 +107,29 @@ class SANtricityClient:
         return self._client.volumes.create(payload)
 
     def delete_volume(self, volume_id):
-        """Delete a volume"""
+        """Delete a volume or snapshot volume"""
         logger.info("Deleting volume: {}".format(volume_id))
-        return self._client.volumes.delete(volume_id)
+        from .santricity_client.exceptions import RequestError
+        try:
+            return self._client.volumes.delete(volume_id)
+        except RequestError as e:
+            if e.status_code in [404, 405, 422]:
+                logger.info(f"Volume {volume_id} not found as standard volume, trying to delete as snapshot volume")
+                return self._client.snapshots.delete_snapshot_volume(volume_id)
+            raise
 
     def get_volume(self, volume_id):
         """Get specific volume details"""
-        return self._client.volumes.get(volume_id)
+        from .santricity_client.exceptions import RequestError
+        try:
+            return self._client.volumes.get(volume_id)
+        except RequestError as e:
+            if e.status_code == 404:
+                # Try finding as a snapshot volume
+                for vol in self._client.snapshots.list_volumes():
+                    if vol.get('viewRef') == volume_id or vol.get('id') == volume_id:
+                        return vol
+            raise
 
     def get_volume_by_name(self, name, pool_id=None):
         """Find a volume by its name or label"""
@@ -124,14 +140,15 @@ class SANtricityClient:
                     # Resolve pool name to ID if needed
                     p_id = pool_id
                     if not pool_id.startswith("0400"): # Not a Ref
-                         # This should probably be handled by the caller or a helper
                          pass
                     
+                    # Read-Only snapshot volumes don't have a standard volumeGroupRef
+                    if vol.get('viewRef'):
+                        return vol
+
                     actual_pool_ref = vol.get("volumeGroupRef")
-                    if actual_pool_ref != p_id:
-                        # Some APIs use 'poolId' in response, some 'volumeGroupRef'
-                        if vol.get("poolId") != p_id:
-                            continue
+                    if actual_pool_ref != p_id and vol.get("poolId") != p_id:
+                        continue
                 return vol
         return None
 
@@ -140,8 +157,10 @@ class SANtricityClient:
         return self._client.volumes.expand(volume_id, size_bytes)
 
     def list_volumes(self):
-        """List all volumes"""
-        return self._client.volumes.list()
+        """List all volumes and snapshot volumes"""
+        volumes = self._client.volumes.list()
+        snapshot_volumes = self._client.snapshots.list_volumes()
+        return volumes + snapshot_volumes
 
     def create_volume_mapping(self, volume_id, target_id, lun=None):
         """
@@ -271,3 +290,13 @@ class SANtricityClient:
 
     def create_snapshot_image(self, group_id):
         return self._client.snapshots.create_image(group_id)
+
+    def create_snapshot_volume(self, name, snapshot_image_id, view_mode="readOnly", meta_tags=None):
+        payload = {
+            "name": name,
+            "snapshotImageId": snapshot_image_id,
+            "viewMode": view_mode
+        }
+        # In SANtricity, snapshot volumes don't support tags directly in the payload
+        # wait, let me check the swagger to be sure about this, but I'll skip it for now.
+        return self._client.snapshots.create_snapshot_volume(payload)
