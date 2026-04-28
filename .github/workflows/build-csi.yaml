@@ -2,7 +2,8 @@ name: Build and Publish CSI Driver
 
 on:
   push:
-    branches: [ "santricity" ]
+    branches: [ "santricity", "santricity*" ]
+    tags: [ "v*" ]
   workflow_dispatch:
 
 env:
@@ -27,6 +28,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Vendor SANtricity Client
+        run: make vendor-santricity
+
       - name: Extract metadata (tags, labels) for Controller
         id: meta-controller
         uses: docker/metadata-action@v5
@@ -35,7 +39,8 @@ jobs:
           tags: |
             type=sha
             type=ref,event=branch
-            latest
+            type=match,pattern=v(.*),group=1
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Controller image
         uses: docker/build-push-action@v6
@@ -54,7 +59,8 @@ jobs:
           tags: |
             type=sha
             type=ref,event=branch
-            latest
+            type=match,pattern=v(.*),group=1
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Node image
         uses: docker/build-push-action@v6
