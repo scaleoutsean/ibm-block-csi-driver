@@ -1,3 +1,5 @@
+from controllers.common.config import config
+
 NAME_PREFIX_SEPARATOR = "_"
 ENDPOINTS_SEPARATOR = ", "
 
@@ -11,6 +13,8 @@ ARRAY_TYPE_SANTRICITY = 'SANtricity'
 ARRAY_TYPE_SOLIDFIRE = 'SolidFire'
 ALL_ARRAY_TYPES = [ARRAY_TYPE_XIV, ARRAY_TYPE_SVC, ARRAY_TYPE_DS8K, ARRAY_TYPE_SANTRICITY, ARRAY_TYPE_SOLIDFIRE]
 
+PARAMETERS_NODE_ID_DELIMITER = config.parameters.node_id_info.delimiter
+PARAMETERS_FCS_DELIMITER = config.parameters.node_id_info.fcs_delimiter
 SPACE_EFFICIENCY_THIN = "thin"
 SPACE_EFFICIENCY_COMPRESSED = "compressed"
 SPACE_EFFICIENCY_DEDUPLICATED = "deduplicated"

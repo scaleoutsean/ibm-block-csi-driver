@@ -1,6 +1,6 @@
 identity:
   name: santricity.block.csi.ibm.com
-  version: 1.13.1
+  version: 1.13.2
   capabilities:
     Service: [ CONTROLLER_SERVICE ]
     VolumeExpansion: ONLINE
@@ -22,6 +22,9 @@ parameters:
   object_id_info:
     delimiter: ":"
     ids_delimiter: ";"
+  node_id_info:
+    delimiter: ";"
+    fcs_delimiter: ":"
 
 connectivity_type:
   nvme_over_fc: "nvmeofc"

@@ -33,7 +33,7 @@ RUN microdnf install -y sg3_utils sg3_utils-libs || exit 1 \
  && (microdnf install -y device-mapper-multipath || microdnf install -y multipath-tools || echo "multipath not available; falling back") \
  && microdnf clean all
 
-ARG VERSION=1.13.1
+ARG VERSION=1.13.2
 ARG BUILD_NUMBER=0
 
 LABEL name="IBM block storage CSI driver node" \
