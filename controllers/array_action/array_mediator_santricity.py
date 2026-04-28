@@ -175,6 +175,39 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         except Exception as ex:
             raise array_errors.MappingError(volume_id, host_name, ex)
 
+    def get_volume_mappings(self, volume_id):
+        logger.debug("getting volume mappings for volume {}".format(volume_id))
+        try:
+            mappings = self.client.list_volume_mappings()
+            
+            target_luns = {}
+            for m in mappings:
+                vol_ref = m.get('volumeRef') or m.get('mappableObjectId')
+                if vol_ref == volume_id:
+                    target_ref = m.get('mapRef') or m.get('targetId')
+                    lun = m.get('lun')
+                    if target_ref and lun is not None:
+                        target_luns[target_ref] = str(lun)
+            
+            result = {}
+            if target_luns:
+                hosts = self.client.list_hosts()
+                for host in hosts:
+                    host_id = host.get('id') or host.get('hostRef')
+                    cluster_ref = host.get('clusterRef')
+                    host_name = host.get('label') or host.get('name')
+                    
+                    if host_id in target_luns:
+                        result[host_name] = target_luns[host_id]
+                    elif cluster_ref in target_luns and cluster_ref != "0000000000000000000000000000000000000000":
+                        result[host_name] = target_luns[cluster_ref]
+                        
+            logger.debug("found volume mappings: {}".format(result))
+            return result
+        except Exception as ex:
+            logger.error("failed to get volume mappings. Reason is: {}".format(ex))
+            raise array_errors.MappingError(volume_id, "all", ex)
+
     def unmap_volume(self, volume_id, host_name):
         host_data = self.client.get_host_by_identifiers(host_name)
         if not host_data:
