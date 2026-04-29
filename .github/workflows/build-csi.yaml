@@ -28,8 +28,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Vendor SANtricity Client
-        run: make vendor-santricity
 
       - name: Extract metadata (tags, labels) for Controller
         id: meta-controller

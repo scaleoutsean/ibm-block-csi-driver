@@ -102,6 +102,17 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
             # Handle Snapshot Restore (Linked Clone)
             if source_type == servers_settings.SNAPSHOT_TYPE_NAME and source_ids:
                 snapshot_image_id = source_ids.uid if source_ids.uid else source_ids.internal_id
+                
+                # If K8s passed a Group ID (330...), map it back to the most recent Image ID (340...)
+                if snapshot_image_id.startswith("33"):
+                    images = self.client._client.snapshots.list_all_images()
+                    g_images = [img for img in images if img.get("pitGroupRef") == snapshot_image_id]
+                    if g_images:
+                        # Find the most recently created image in the group
+                        g_images.sort(key=lambda x: int(x.get("pitTimestamp", "0")), reverse=True)
+                        logger.warning(f"K8s passed Snapshot Group ID {snapshot_image_id}, dynamically substituting Image ID {g_images[0].get('pitRef')}")
+                        snapshot_image_id = g_images[0].get("pitRef") or g_images[0].get("id")
+
                 logger.info(f"Creating read-only snapshot volume {name} from snapshot image {snapshot_image_id}")
                 vol_data = self.client.create_snapshot_volume(name=name, snapshot_image_id=snapshot_image_id, view_mode="readOnly")
                 return self._to_volume_object(vol_data)
@@ -111,6 +122,9 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
                                                  meta_tags=meta_tags)
             return self._to_volume_object(vol_data)
         except Exception as ex:
+            # If we were attempting a Linked Clone, do NOT fall back to standard volume creation!
+            if source_type == servers_settings.SNAPSHOT_TYPE_NAME:
+                raise
             # If raidAll fails, fallback to None
             if raid_level == 'raidAll' and not space_efficiency:
                 logger.info("Failed to create volume with raidAll default, retrying with None")
@@ -323,7 +337,9 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         )
 
     def copy_to_existing_volume(self, volume_id, source_id, source_capacity_in_bytes, minimum_volume_size_in_bytes):
-        raise NotImplementedError()
+        # Implementation is not required for SANtricity snapshots
+        # Clones are created implicitly inside create_volume
+        pass
 
     def get_iscsi_targets_by_iqn(self, host_name):
         target_settings = self.client.get_iscsi_target_settings()
@@ -443,6 +459,23 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
                 return self._to_volume_object(vol_data)
             except Exception:
                 return None
+        elif object_type == servers_settings.SNAPSHOT_TYPE_NAME:
+            try:
+                images = self.client._client.snapshots.list_all_images()
+                # Sort descending to favor newest if matching by group
+                images.sort(key=lambda x: int(x.get("pitTimestamp", "0")), reverse=True)
+                for image in images:
+                    if image.get("pitRef") == object_id or image.get("id") == object_id or image.get("pitGroupRef") == object_id:
+                        vol_data = self.client.get_volume(image.get("baseVol"))
+                        img_data = {
+                            "id": image.get("pitRef") or image.get("id"),
+                            "name": "",
+                            "baseVolume": image.get("baseVol"),
+                            "pitGroupRef": image.get("pitGroupRef")
+                        }
+                        return self._to_snapshot_object(img_data, vol_data)
+            except Exception:
+                return None
         return None
 
 
@@ -503,17 +536,27 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         raise NotImplementedError()
 
     def get_snapshot(self, volume_id, snapshot_name, pool=None, is_virt_snap_func=False):
-        groups = self.client.list_snapshot_groups()
+        images = self.client._client.snapshots.list_all_images()
         
         # generate the likely short suffix for our custom name format
         suffix = snapshot_name[-4:] if len(snapshot_name) >= 4 else snapshot_name
         
-        for g in groups:
-            if g.get("baseVolume") == volume_id:
-                g_name = g.get("name", "")
+        for image in images:
+            if image.get("baseVol") == volume_id:
+                # We don't have the group name exactly, but check if the ID was created by us
+                # In SANtricity, snapshot images don't have a mutable name, but the group does.
+                # So we lookup the group to verify the name
+                group = self.client.get_snapshot_group(image.get("pitGroupRef"))
+                g_name = group.get("name", "")
                 if g_name == snapshot_name or g_name.endswith(f"_{suffix}"):
                     vol_data = self.client.get_volume(volume_id)
-                    return self._to_snapshot_object(g, vol_data)
+                    img_data = {
+                        "id": image.get("pitRef") or image.get("id"),
+                        "name": snapshot_name,
+                        "baseVolume": volume_id,
+                        "pitGroupRef": image.get("pitGroupRef")
+                    }
+                    return self._to_snapshot_object(img_data, vol_data)
         return None
 
     def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func, partition_name=None):
@@ -548,23 +591,48 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         
         vol_data = self.client.get_volume(volume_id)
         
-        # Return Snapshot object, we just need to grab the group data for `internal_id` 
-        # Wait, the image_data has `pitGroupRef`. Let's mock a group_data-like object out of image
-        group_ref = image_data.get("pitGroupRef")
-        group_data = {
-            "id": group_ref,
+        # Grab the newly created snapshot image by finding the most recent image for this volume.
+        # This completely avoids name-matching issues on reused snapshot groups.
+        images = self.client._client.snapshots.list_all_images()
+        v_images = [img for img in images if img.get("baseVol") == volume_id]
+        if v_images:
+            v_images.sort(key=lambda x: int(x.get("pitTimestamp", "0")), reverse=True)
+            target_image = v_images[0]
+            img_data = {
+                "id": target_image.get("pitRef") or target_image.get("id"),
+                "name": snapshot_name,
+                "baseVolume": volume_id,
+                "pitGroupRef": target_image.get("pitGroupRef")
+            }
+            return self._to_snapshot_object(img_data, vol_data)
+        
+        # Desperate fallback
+        logger.warning(f"Could not fetch snapshot image {snapshot_name} after creation!")
+        img_data = {
+            "id": image_data.get("pitRef") or image_data.get("id"),
             "name": snapshot_name,
             "baseVolume": volume_id,
-            "pitGroupRef": group_ref
+            "pitGroupRef": image_data.get("pitGroupRef")
         }
-        return self._to_snapshot_object(group_data, vol_data)
+        return self._to_snapshot_object(img_data, vol_data)
 
 
 
     def delete_snapshot(self, snapshot_id, internal_snapshot_id, partition_name=None):
         import logging
         logger = logging.getLogger(__name__)
-        logger.info(f"Deleting snapshot group: {snapshot_id}")
+        logger.info(f"Deleting snapshot image/group: {snapshot_id}")
+        
+        # Determine if we got an image (pitRef `34`) or group (`33`)
+        try:
+            if snapshot_id.startswith("34"):
+                image = self.client._client.snapshots.get_snapshot_image(snapshot_id)
+                if image:
+                   group_ref = image.get("pitGroupRef")
+                   self.client.delete_snapshot_group(group_ref)
+                   return
+        except Exception:
+            pass
         self.client.delete_snapshot_group(snapshot_id)
 
 
