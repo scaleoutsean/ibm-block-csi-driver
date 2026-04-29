@@ -327,7 +327,19 @@ func (d *NodeService) formatAndMount(mpathDevice string, stagingPath string, fsT
 	}
 
 	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsTypeForMount)
-	return d.Mounter.FormatAndMount(mpathDevice, stagingPath, fsTypeForMount, mountOptions) // Passing without /host because k8s mounter uses mount\mkfs\fsck
+	err := d.Mounter.FormatAndMount(mpathDevice, stagingPath, fsTypeForMount, mountOptions)
+	if err != nil {
+		if strings.Contains(err.Error(), "No data available") || strings.Contains(err.Error(), "write-protected") || strings.Contains(err.Error(), "read-only") {
+			logger.Warningf("Mounting %s failed with %v, retrying with ro flags", mpathDevice, err)
+			if fsTypeForMount == "xfs" {
+				mountOptions = []string{"nouuid", "ro", "norecovery"}
+			} else {
+				mountOptions = []string{"ro", "noload"}
+			}
+			err = d.Mounter.FormatAndMount(mpathDevice, stagingPath, fsTypeForMount, mountOptions)
+		}
+	}
+	return err
 }
 
 func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
