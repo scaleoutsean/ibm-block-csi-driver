@@ -75,6 +75,56 @@ kubectl apply -f ./deploy/santricity-solidfire/csi.ibm.com_v1_ibmblockcsi_cr.yam
 
 You can test installation flow without an attached E-Series array. The operator, CRDs, and CSI workloads should deploy. Volume provisioning will fail until `secret-santricity.yaml` points to a reachable array.
 
+## Storage Configuration
+
+The driver supports two types of SANtricity storage entities: **Traditional Volume Groups** and **Dynamic Disk Pools (DDP)**.
+
+### 1. Traditional Volume Groups (RAID 1/5/6)
+
+Traditional groups define the RAID level at the group level. Volumes created in these groups inherit the group's RAID properties. Do **not** specify `SpaceEfficiency` in the `StorageClass`.
+
+**Sample StorageClass:**
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: santricity-traditional-vg
+provisioner: santricity.block.csi.ibm.com
+parameters:
+  pool: "vg_r5"  # Name or ID of the Traditional Volume Group on the array
+```
+
+### 2. Dynamic Disk Pools (DDP)
+
+DDP pools are modern distributed parity pools. While they handle redundancy automatically, the `SpaceEfficiency` parameter can be used to set the preferred redundancy level (defaults to `raid6`).
+
+**Sample StorageClass (with RAID 6 default):**
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: santricity-ddp-pool
+provisioner: santricity.block.csi.ibm.com
+parameters:
+  pool: "ddp_pool"  # Name or ID of the DDP Pool on the array
+  SpaceEfficiency: "raid6"
+```
+
+**Sample StorageClass (with RAID 1 override):**
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: santricity-ddp-raid1
+provisioner: santricity.block.csi.ibm.com
+parameters:
+  pool: "ddp_pool"
+  SpaceEfficiency: "raid1"
+```
+
 ### Snapshot Support
 
 For snapshot provisioning and deletion to work, make sure that Kubernetes external snapshotter CRDs, Snapshot Controller, and an appropriate `VolumeSnapshotClass` are installed in your cluster.
@@ -142,87 +192,39 @@ Remember to update, and then apply the secret file:
 
 ```sh
 kubectl apply -f ./deploy/santricity-solidfire/secret-santricity.yaml
-    ```
-
-    ### Kubernetes PVC Metadata tags
-
-    The IBM block CSI driver orchestrates Volume provisioning metadata by converting `csi.storage.k8s.io/*` keys (like `pvc_name` and `pvc_namespace`) into SANtricity volume Metadata tags. This drastically helps track K8s volume objects (like `csi_AdNDmArncUqCAG842z1H4Lj4xc`) to their native Kubernetes PVC names.
-
-    However, the `csi-provisioner` sidecar drops these PVC keys before passing the provisioning request to the CSI driver unless it runs with the `--extra-create-metadata=true` startup argument.
-
-    Because this driver is tightly managed by the IBM Block CSI Operator (`ibm-block-csi-operator.yaml`), the custom resource `csi.ibm.com_v1_ibmblockcsi_cr.yaml` strictly limits the configurable sidecar fields to only `imagePullPolicy`, `name`, `repository`, and `tag`. It does **not** support injecting custom `args` per the schema definition.
-
-    To enable natively visible PVC names on your SANtricity array, you must scale the operator down and manually patch the provisionser sidecar:
-
-    ```sh
-    # 1. Stop the operator from reverting your manual changes
-    kubectl scale deployment ibm-block-csi-operator-controller-manager --replicas=0
-
-    # 2. Edit the deployed CSI controller StatefulSet
-    kubectl edit statefulset ibm-block-csi-controller
-    ```
-
-    **3. Add \`--extra-create-metadata=true\` to the \`csi-provisioner\` container args array:**
-
-    Locate the `csi-provisioner` container in the open editor block and add the new argument:
-
-    ```yaml
-          - name: csi-provisioner
-            image: registry.k8s.io/sig-storage/csi-provisioner:v4.0.1
-            args:
-            - --csi-address=$(ADDRESS)
-            - --v=5
-            - --timeout=120s
-            - --retry-interval-start=500ms
-            - --extra-create-metadata=true
-## Storage Configuration
-
-The driver supports two types of SANtricity storage entities: **Traditional Volume Groups** and **Dynamic Disk Pools (DDP)**.
-
-### 1. Traditional Volume Groups (RAID 1/5/6)
-
-Traditional groups define the RAID level at the group level. Volumes created in these groups inherit the group's RAID properties. Do **not** specify `SpaceEfficiency` in the `StorageClass`.
-
-**Sample StorageClass:**
-
-```yaml
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: santricity-traditional-vg
-provisioner: block.csi.ibm.com
-parameters:
-  pool: "vg_r5"  # Name or ID of the Traditional Volume Group on the array
 ```
 
-### 2. Dynamic Disk Pools (DDP)
+### Kubernetes PVC Metadata tags
 
-DDP pools are modern distributed parity pools. While they handle redundancy automatically, the `SpaceEfficiency` parameter can be used to set the preferred redundancy level (defaults to `raid6`).
+The IBM block CSI driver orchestrates Volume provisioning metadata by converting `csi.storage.k8s.io/*` keys (like `pvc_name` and `pvc_namespace`) into SANtricity volume Metadata tags. This drastically helps track K8s volume objects (like `csi_AdNDmArncUqCAG842z1H4Lj4xc`) to their native Kubernetes PVC names.
 
-**Sample StorageClass (with RAID 6 default):**
+However, the `csi-provisioner` sidecar drops these PVC keys before passing the provisioning request to the CSI driver unless it runs with the `--extra-create-metadata=true` startup argument.
 
-```yaml
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: santricity-ddp-pool
-provisioner: block.csi.ibm.com
-parameters:
-  pool: "ddp_pool"  # Name or ID of the DDP Pool on the array
-  SpaceEfficiency: "raid6"
+Because this driver is tightly managed by the IBM Block CSI Operator (`ibm-block-csi-operator.yaml`), the custom resource `csi.ibm.com_v1_ibmblockcsi_cr.yaml` strictly limits the configurable sidecar fields to only `imagePullPolicy`, `name`, `repository`, and `tag`. It does **not** support injecting custom `args` per the schema definition.
+
+To enable natively visible PVC names on your SANtricity array, you must scale the operator down and manually patch the provisionser sidecar:
+
+```sh
+# 1. Stop the operator from reverting your manual changes
+kubectl scale deployment ibm-block-csi-operator-controller-manager --replicas=0
+
+# 2. Edit the deployed CSI controller StatefulSet
+kubectl edit statefulset ibm-block-csi-controller
 ```
 
-**Sample StorageClass (with RAID 1 override):**
+**3. Add \`--extra-create-metadata=true\` to the \`csi-provisioner\` container args array:**
+
+Locate the `csi-provisioner` container in the open editor block and add the new argument:
 
 ```yaml
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: santricity-ddp-raid1
-provisioner: block.csi.ibm.com
-parameters:
-  pool: "ddp_pool"
-  SpaceEfficiency: "raid1"
+      - name: csi-provisioner
+        image: registry.k8s.io/sig-storage/csi-provisioner:v4.0.1
+        args:
+        - --csi-address=$(ADDRESS)
+        - --v=5
+        - --timeout=120s
+        - --retry-interval-start=500ms
+        - --extra-create-metadata=true
 ```
 
 ## Update

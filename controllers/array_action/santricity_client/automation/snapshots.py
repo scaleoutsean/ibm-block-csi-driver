@@ -183,7 +183,7 @@ class SnapshotsAutomation:
                 use_free_repository_volumes=False,
                 concat_volume_type="snapshot",
             )
-            candidate = candidates[0] if isinstance(candidates, list) and candidates else None
+            candidate = candidates[0].get("candidate") if isinstance(candidates, list) and candidates else None
             repository_ref = str(grow_target.get("repositoryRef") or "")
             if candidate and repository_ref:
                 self._client.snapshots.expand_repository(
@@ -212,6 +212,7 @@ class SnapshotsAutomation:
             group_data = self._client.snapshots.create_group(group_payload)
             resolved_group_ref = group_data["id"]
 
+            logger.info("group_payload: %s", group_payload)
         # Now take the snapshot in the resolved group
         logger.info("Taking snapshot image in group {%s}", resolved_group_ref)
         image_data = self._client.snapshots.create_image(resolved_group_ref)

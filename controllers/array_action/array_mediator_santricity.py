@@ -290,7 +290,9 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         initiators = {}
         if connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
             target_settings = self.client.get_iscsi_target_settings()
-            iqn = target_settings.get('nodeName')
+            # nodeName is a dict in SANtricity, handle both string and dict
+            node_name_field = target_settings.get('nodeName')
+            iqn = node_name_field.get('iscsiNodeName') if isinstance(node_name_field, dict) else node_name_field
             
             interfaces = hostside_interfaces_report(self.client._client, protocol="iscsi")
             portals = [i['ipv4_address'] for i in interfaces if i.get('is_link_up') and i.get('is_ipv4_enabled') and i.get('ipv4_address')]
@@ -299,7 +301,9 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
                 initiators[iqn] = portals
         elif connectivity_type == array_settings.NVME_OVER_ROCE_CONNECTIVITY_TYPE:
             target_settings = self.client.get_nvme_target_settings()
-            nqn = target_settings.get('nodeName')
+            # nodeName is a dict in SANtricity, handle both string and dict
+            node_name_field = target_settings.get('nodeName')
+            nqn = node_name_field.get('nvmeNodeName') if isinstance(node_name_field, dict) else node_name_field
             
             interfaces = hostside_interfaces_report(self.client._client, protocol="ethernet")
             portals = [
