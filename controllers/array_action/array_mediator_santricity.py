@@ -638,7 +638,14 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
             except Exception as e:
                 logger.warning(f"Failed to lookup image for deletion: {e}")
         
-        self.client.delete_snapshot_group(group_ref)
+        from controllers.array_action.santricity_client.exceptions import RequestError
+        from controllers.array_action.errors import ObjectNotFoundError
+        try:
+            self.client.delete_snapshot_group(group_ref)
+        except RequestError as e:
+            if e.status_code == 404 or "objectNotFound" in str(e):
+                raise ObjectNotFoundError(snapshot_id)
+            raise e
 
 
     def get_array_fc_wwns(self, host_name):
