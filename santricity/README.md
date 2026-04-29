@@ -44,18 +44,14 @@ To build the driver with SANtricity support, you must vendor the `santricity-cli
 
 If you don't want to build your own, skip to **Installation**.
 
-1.  **Vendor the library**:
-    ```bash
-    make vendor-santricity
-    ```
-    This clones the latest client library from [scaleoutsean/santricity-client](https://github.com/scaleoutsean/santricity-client) into the local source tree.
+Previously we used to run "`make vendor-santricity`" to clone the latest client library from [scaleoutsean/santricity-client](https://github.com/scaleoutsean/santricity-client) into the local source tree, but because IBM Block Driver CSI runs on outdated Python 3.9, this has proven very brittle. This patch now includes manually integrated source code from SANtricity Client library.
 
-2.  **Build the Controller image**:
+1.  **Build the Controller image**:
     ```bash
     docker build -f Dockerfile-csi-controller -t ibm-block-csi-controller:latest .
     ```
 
-3.  **Build the Node image**:
+2.  **Build the Node image**:
     ```bash
     docker build -f Dockerfile-csi-node -t ibm-block-csi-node:latest .
     ```
@@ -70,10 +66,20 @@ kubectl apply -f ./deploy/santricity-solidfire/ibm-block-csi-operator.yaml
 kubectl wait --for=condition=Established --timeout=120s crd/hostdefiners.csi.ibm.com
 kubectl wait --for=condition=Established --timeout=120s crd/hostdefinitions.csi.ibm.com
 kubectl wait --for=condition=Established --timeout=120s crd/ibmblockcsis.csi.ibm.com
+```
+
+If you used own images, change image locations in this file first. If you're using pre-built, run this step.
+
+```sh
 kubectl apply -f ./deploy/santricity-solidfire/csi.ibm.com_v1_ibmblockcsi_cr.yaml
 ```
 
-You can test installation flow without an attached E-Series array. The operator, CRDs, and CSI workloads should deploy. Volume provisioning will fail until `secret-santricity.yaml` points to a reachable array.
+You can test installation flow without an attached E-Series array. The operator, CRDs, and CSI workloads should deploy. Volume provisioning will fail until `secret-santricity.yaml` points to a reachable array:
+
+```sh
+vim ./deploy/santricity-solidfire/secret-santricity.yaml # edit TLS verify, credentials
+# kubectl create -f ./deploy/santricity-solidfire/secret-santricity.yaml # create secret
+```
 
 ## Storage Configuration
 
@@ -125,7 +131,7 @@ parameters:
   SpaceEfficiency: "raid1"
 ```
 
-### Snapshot Support
+## Snapshot Support
 
 For snapshot provisioning and deletion to work, make sure that Kubernetes external snapshotter CRDs, Snapshot Controller, and an appropriate `VolumeSnapshotClass` are installed in your cluster.
 
@@ -241,11 +247,15 @@ Update the Node Agents (DaemonSet)
 kubectl rollout restart daemonset ibm-block-csi-node
 ```
 
-Or just one command that does two things at once.
+Or re-install CSI Controller and Node:
 
 ```sh
+kubectl delete -f ./deploy/santricity-solidfire/csi.ibm.com_v1_ibmblockcsi_cr.yaml
+# wait until CSI Controller and Node pods terminate - roughly 60s
 kubectl apply -f ./deploy/santricity-solidfire/csi.ibm.com_v1_ibmblockcsi_cr.yaml
 ```
+
+When upgrading, you may want to make sure the images did get refreshed, especially if tags remained the same (e.g. `:latest`).
 
 ## Testing
 
@@ -294,6 +304,8 @@ IBM Block Storage CSI drivers creates (too?) unique volume names that aren't sup
 - pvc_namespace - from csi.storage.k8s.io/pvc/namespace
 - pv_name - from csi.storage.k8s.io/pv/name
 - fstype - from csi.storage.k8s.io/fstype
+
+SANtricity snapshots must be deleted in strict order of creation, which means you can't delete the second oldest snapshot without deleting the oldest before it. Secondly, the API allows "yanking", so deleting a volume deletes without warnings all snapshots and linked clones that depend on it.
 
 ## SolidFire Support
 

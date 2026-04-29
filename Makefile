@@ -79,14 +79,25 @@ gofmt:
 
 .PHONY: vendor-santricity
 vendor-santricity:
-	@echo ">> vendoring santricity-client from ref $(SANTRICITY_CLIENT_REF)"
-	rm -rf controllers/array_action/santricity_client
-	rm -rf /tmp/santricity-client
-	git clone --depth 1 --branch $(SANTRICITY_CLIENT_REF) $(SANTRICITY_CLIENT_REPO) /tmp/santricity-client
-	cp -r /tmp/santricity-client/src/santricity_client controllers/array_action/
-	rm -rf /tmp/santricity-client
-	@echo ">> Patching python 3.9 dataclass compatibility..."
-	find controllers/array_action/santricity_client -type f -name "*.py" -exec sed -i -e 's/(slots=True)//g' -e 's/slots=True, //g' -e 's/, slots=True//g' -e 's/FieldTransform | None/Any/g' {} +
+	@echo "======================================================================"
+	@echo "                       DO NOT RUN THIS COMMAND                        "
+	@echo "    The santricity_client has been manually verified and patched      "
+	@echo "    with custom fixes (e.g., snapshot payload fixes, python 3.9       "
+	@echo "    dataclass compatibility) directly in this repo.                   "
+	@echo "    Running this will OVERWRITE the local modifications in             "
+	@echo "    controllers/array_action/santricity_client/ with upstream master. "
+	@echo "    If you wish to update from upstream, please port the active       "
+	@echo "    modifications from automation/snapshots.py to upstream first!     "
+	@echo "======================================================================"
+	@exit 1
+#	@echo ">> vendoring santricity-client from ref $(SANTRICITY_CLIENT_REF)"
+#	rm -rf controllers/array_action/santricity_client
+#	rm -rf /tmp/santricity-client
+#	git clone --depth 1 --branch $(SANTRICITY_CLIENT_REF) $(SANTRICITY_CLIENT_REPO) /tmp/santricity-client
+#	cp -r /tmp/santricity-client/src/santricity_client controllers/array_action/
+#	rm -rf /tmp/santricity-client
+#	@echo ">> Patching python 3.9 dataclass compatibility..."
+#	find controllers/array_action/santricity_client -type f -name "*.py" -exec sed -i -e 's/(slots=True)//g' -e 's/slots=True, //g' -e 's/, slots=True//g' -e 's/FieldTransform | None/Any/g' {} +
 
 .PHONY: csi-build-images-and-push-artifactory
 csi-build-images-and-push-artifactory:
