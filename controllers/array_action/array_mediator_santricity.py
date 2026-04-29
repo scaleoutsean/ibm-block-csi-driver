@@ -292,7 +292,7 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
             target_settings = self.client.get_iscsi_target_settings()
             iqn = target_settings.get('nodeName')
             
-            interfaces = hostside_interfaces_report(self.client, protocol="iscsi")
+            interfaces = hostside_interfaces_report(self.client._client, protocol="iscsi")
             portals = [i['ipv4_address'] for i in interfaces if i.get('is_link_up') and i.get('is_ipv4_enabled') and i.get('ipv4_address')]
             
             if iqn:
@@ -301,7 +301,7 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
             target_settings = self.client.get_nvme_target_settings()
             nqn = target_settings.get('nodeName')
             
-            interfaces = hostside_interfaces_report(self.client, protocol="ethernet")
+            interfaces = hostside_interfaces_report(self.client._client, protocol="ethernet")
             portals = [
                 i['command_ipv4_address'] 
                 for i in interfaces 
