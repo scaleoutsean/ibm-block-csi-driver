@@ -547,7 +547,7 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
                 # In SANtricity, snapshot images don't have a mutable name, but the group does.
                 # So we lookup the group to verify the name
                 group = self.client.get_snapshot_group(image.get("pitGroupRef"))
-                g_name = group.get("name", "")
+                g_name = group.get("name", "") if group else ""
                 if g_name == snapshot_name or g_name.endswith(f"_{suffix}"):
                     vol_data = self.client.get_volume(volume_id)
                     img_data = {
@@ -624,16 +624,17 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
         logger.info(f"Deleting snapshot image/group: {snapshot_id}")
         
         # Determine if we got an image (pitRef `34`) or group (`33`)
-        try:
-            if snapshot_id.startswith("34"):
-                image = self.client._client.snapshots.get_snapshot_image(snapshot_id)
+        group_ref = snapshot_id
+        if snapshot_id.startswith("34"):
+            try:
+                images = self.client._client.snapshots.list_all_images()
+                image = next((img for img in images if img.get("pitRef") == snapshot_id or img.get("id") == snapshot_id), None)
                 if image:
-                   group_ref = image.get("pitGroupRef")
-                   self.client.delete_snapshot_group(group_ref)
-                   return
-        except Exception:
-            pass
-        self.client.delete_snapshot_group(snapshot_id)
+                    group_ref = image.get("pitGroupRef")
+            except Exception as e:
+                logger.warning(f"Failed to lookup image for deletion: {e}")
+        
+        self.client.delete_snapshot_group(group_ref)
 
 
     def get_array_fc_wwns(self, host_name):
