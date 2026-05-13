@@ -11,4 +11,4 @@ parameters:
   virt_snap_func: "false"            # Optional. Values true/false. The default is false.
 
   csi.storage.k8s.io/snapshotter-secret-name: solidfire-secret
-  csi.storage.k8s.io/snapshotter-secret-namespace: default
+  csi.storage.k8s.io/snapshotter-secret-namespace: santricity

@@ -165,7 +165,7 @@ driver: santricity.block.csi.ibm.com # different from IBM's driver name
 deletionPolicy: Delete
 parameters:
   csi.storage.k8s.io/snapshotter-secret-name: santricity-secret
-  csi.storage.k8s.io/snapshotter-secret-namespace: default
+  csi.storage.k8s.io/snapshotter-secret-namespace: santricity
 
   # Optional: initial snapshot repository group size, as % of base volume.
   # Used only when no eligible snapshot group exists and the driver must create one.
@@ -216,7 +216,13 @@ This uses pre-built images from Github Container Registry:
 - ghcr.io/scaleoutsean/ibm-block-csi-driver-controller:latest
 - ghcr.io/scaleoutsean/ibm-block-csi-driver-node:latest
 
-To avoid conflicting with the usual namespace (`ibm-block-csi`), this CSI driver by default installs in the default namespace. You may modify YAML files as necessary.
+To avoid conflicting with the original upstream namespace (`ibm-block-csi`) and to provide standard isolation, this CSI driver defaults to the `santricity` namespace. You must create this namespace before deployment:
+
+```sh
+kubectl create namespace santricity
+```
+
+You may modify YAML files to use a different namespace if necessary.
 
 Remember to update, and then apply the secret file:
 

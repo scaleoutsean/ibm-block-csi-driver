@@ -16,7 +16,19 @@ This is a specialized fork of the IBM Block CSI driver, modified to support NetA
 
 1.  **Unique Name**: This fork has been updated to use `santricity.block.csi.ibm.com`.
 2.  **Unique StorageClasses**: Use the provided demo StorageClasses in this directory, which reference the new provisioner name.
-3.  **Namespace Separation**: Deploy this driver into its own namespace (e.g., `ibm-block-santricity-csi`).
+3.  **Namespace Separation**: Deploy this driver's infrastructure into its own namespace (e.g., `santricity`).
+
+## Running the Demo Examples
+
+When testing PVC creation, snapshots, and other resources using the examples in this directory, we highly recommend creating a dedicated namespace (e.g., `demo`) instead of using the `default` namespace. 
+
+```sh
+kubectl create namespace demo
+kubectl apply -f demo-pvc-santricity.yaml -n demo
+```
+
+**Why?** 
+Tools like Velero (for cluster backup and restore) operate at the namespace level. If you mix demo testing resources into the `default` namespace alongside real workloads, a restore operation becomes unnecessarily risky and could accidentally impact other cluster elements. Using a dedicated `demo` namespace makes experimentation, backups, and cleanup much safer!
 
 ## Supported Protocols
 

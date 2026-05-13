@@ -3242,7 +3242,7 @@ metadata:
     product: ibm-block-csi-driver
     release: v1.13.1
   name: ibm-block-csi-operator
-  namespace: default
+  namespace: santricity
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -3537,7 +3537,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: ibm-block-csi-operator
-  namespace: default
+  namespace: santricity
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -3549,7 +3549,7 @@ metadata:
     csi: ibm
     product: ibm-block-csi-driver
   name: ibm-block-csi-operator
-  namespace: default
+  namespace: santricity
 spec:
   strategy:
     type: Recreate

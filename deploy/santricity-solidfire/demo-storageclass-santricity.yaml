@@ -12,11 +12,11 @@ parameters:
   
   csi.storage.k8s.io/fstype: xfs
   csi.storage.k8s.io/secret-name: santricity-secret
-  csi.storage.k8s.io/secret-namespace: default
+  csi.storage.k8s.io/secret-namespace: santricity
   csi.storage.k8s.io/provisioner-secret-name: santricity-secret
-  csi.storage.k8s.io/provisioner-secret-namespace: default
+  csi.storage.k8s.io/provisioner-secret-namespace: santricity
   csi.storage.k8s.io/controller-publish-secret-name: santricity-secret
-  csi.storage.k8s.io/controller-publish-secret-namespace: default
+  csi.storage.k8s.io/controller-publish-secret-namespace: santricity
   csi.storage.k8s.io/node-stage-secret-name: santricity-secret
-  csi.storage.k8s.io/node-stage-secret-namespace: default
+  csi.storage.k8s.io/node-stage-secret-namespace: santricity
 allowVolumeExpansion: true

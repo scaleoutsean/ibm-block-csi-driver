@@ -6,7 +6,7 @@ driver: santricity.block.csi.ibm.com
 deletionPolicy: Delete
 parameters:
   csi.storage.k8s.io/snapshotter-secret-name: santricity-secret
-  csi.storage.k8s.io/snapshotter-secret-namespace: default
+  csi.storage.k8s.io/snapshotter-secret-namespace: santricity
 
   # Optional: initial snapshot repository group size, as % of base volume.
   # Used only when no eligible snapshot group exists and the driver must create one.
