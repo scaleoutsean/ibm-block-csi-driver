@@ -16,7 +16,7 @@ These are the capabilities the driver explicitly reports to Kubernetes during th
 
 - Controller Capabilities: Reported in `csi_controller_server.py`
   - CREATE_DELETE_VOLUME (Dynamic Provisioning)
-  - CREATE_DELETE_SNAPSHOT (Snapshots)
+  - CREATE_DELETE_SNAPSHOT (Snapshots) 
   - PUBLISH_UNPUBLISH_VOLUME (Attach/Detach)
   - CLONE_VOLUME (Volume Cloning)
   - EXPAND_VOLUME (Offline/Online Resizing)
@@ -132,6 +132,8 @@ parameters:
 ```
 
 ## Snapshot Support
+
+Upstream (IBM Block Driver CSI) does not implement Volume Group Snapshots as of v1.13.2. Therefore, only individual volume snapshots are currently available in this patch.
 
 For snapshot provisioning and deletion to work, make sure that Kubernetes external snapshotter CRDs, Snapshot Controller, and an appropriate `VolumeSnapshotClass` are installed in your cluster.
 
