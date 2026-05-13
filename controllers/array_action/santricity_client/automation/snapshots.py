@@ -220,3 +220,10 @@ class SnapshotsAutomation:
         image_data = self._client.snapshots.create_image(resolved_group_ref)
         return image_data
 
+    def create_cg_snapshot(self, cg_ref: str) -> list[dict[str, Any]]:
+        """Take a snapshot of a Consistency Group, verifying members exist first."""
+        members = self._client.consistency_groups.list_member_volumes(cg_ref)
+        if not members:
+            raise RuntimeError(f"Cannot take snapshot of consistency group '{cg_ref}': it has no member volumes.")
+        
+        return self._client.consistency_groups.create_snapshot(cg_ref)

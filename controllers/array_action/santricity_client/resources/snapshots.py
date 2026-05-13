@@ -64,10 +64,6 @@ class SnapshotsResource(ResourceBase):
         """List all snapshot images across all snapshot groups."""
         return self._get("/snapshot-images")
 
-    def delete_snapshot_volume(self, view_ref: str) -> None:
-        """Delete a snapshot volume (linked clone/view) by its ref."""
-        self._delete(f"/snapshot-volumes/{view_ref}")
-
     def list_volumes(self) -> list[dict[str, Any]]:
         """List snapshot volumes (linked clones and read-only views)."""
         return self._get("/snapshot-volumes")

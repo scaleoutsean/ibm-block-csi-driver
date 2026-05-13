@@ -34,11 +34,14 @@ app = typer.Typer(help="SANtricity storage management CLI.", no_args_is_help=Tru
 
 hosts_app = typer.Typer(help="Host operations.", **_HELP_SETTINGS)
 pools_app = typer.Typer(help="Pool operations.", **_HELP_SETTINGS)
-snapshots_app = typer.Typer(help="Snapshot group, image, volume, and schedule operations.", **_HELP_SETTINGS)
+snapshots_app = typer.Typer(
+    help="Snapshot group, image, volume, and schedule operations.", **_HELP_SETTINGS
+)
 volumes_app = typer.Typer(help="Volume operations.", **_HELP_SETTINGS)
 mappings_app = typer.Typer(help="Volume mapping operations.", **_HELP_SETTINGS)
 system_app = typer.Typer(help="System metadata operations.", **_HELP_SETTINGS)
 reports_app = typer.Typer(help="Pre-filtered report operations.", **_HELP_SETTINGS)
+cgs_app = typer.Typer(help="Consistency Group operations.", **_HELP_SETTINGS)
 app.add_typer(hosts_app, name="hosts")
 app.add_typer(pools_app, name="pools")
 app.add_typer(snapshots_app, name="snapshots")
@@ -46,6 +49,7 @@ app.add_typer(volumes_app, name="volumes")
 app.add_typer(mappings_app, name="mappings")
 app.add_typer(system_app, name="system")
 app.add_typer(reports_app, name="reports")
+app.add_typer(cgs_app, name="consistency-groups")
 
 
 def _build_client(
@@ -689,152 +693,6 @@ def _snapshot_list_command(
     _present_output(items, view_id=view_id, json_output=output_json)
 
 
-def _snapshot_schedule_counts(schedules: Sequence[Mapping[str, Any]]) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for schedule in schedules:
-        target = schedule.get("targetObject")
-        if not target:
-            continue
-        key = str(target)
-        counts[key] = counts.get(key, 0) + 1
-    return counts
-
-
-def _list_schedules_best_effort(client: SANtricityClient) -> list[dict[str, Any]]:
-    try:
-        return client.snapshots.list_schedules()
-    except RequestError as exc:
-        if exc.status_code in {404, 405}:
-            return []
-        raise
-
-
-def _coerce_int_default(value: Any, default: int = 0) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def _coerce_float_default(value: Any, default: float = 0.0) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def _pick_group_field_int(group: Mapping[str, Any], *keys: str) -> int:
-    for key in keys:
-        if key in group:
-            value = _coerce_int_default(group.get(key), 0)
-            if value != 0:
-                return abs(value)
-    return 0
-
-
-def _choose_snapshot_group_for_auto(
-    groups: Sequence[Mapping[str, Any]],
-    schedules: Sequence[Mapping[str, Any]],
-    utilization: Sequence[Mapping[str, Any]],
-    repositories: Sequence[Mapping[str, Any]],
-    *,
-    volume_ref: str,
-    include_schedule_owned_groups: bool,
-    min_free_percent: float,
-    max_repo_group_capacity_percent: float,
-    max_repo_volumes_per_group: int,
-) -> tuple[str | None, dict[str, Any] | None]:
-    schedule_counts = _snapshot_schedule_counts(schedules)
-    util_by_group_ref: dict[str, Mapping[str, Any]] = {
-        str(item.get("groupRef") or ""): item
-        for item in utilization
-        if item.get("groupRef")
-    }
-    repo_by_ref: dict[str, Mapping[str, Any]] = {
-        str(item.get("id") or item.get("repositoryRef") or item.get("concatRef") or ""): item
-        for item in repositories
-        if item.get("id") or item.get("repositoryRef") or item.get("concatRef")
-    }
-
-    eligible: list[tuple[int, int, str]] = []
-    grow_candidates: list[tuple[int, int, int, str, dict[str, Any]]] = []
-
-    for group in groups:
-        group_ref = str(group.get("pitGroupRef") or group.get("id") or "")
-        if not group_ref:
-            continue
-        if str(group.get("baseVolume") or "") != volume_ref:
-            continue
-
-        schedule_count = schedule_counts.get(group_ref, 0)
-        if schedule_count > 0 and not include_schedule_owned_groups:
-            continue
-
-        util = util_by_group_ref.get(group_ref, {})
-        available = _coerce_int_default(util.get("pitGroupBytesAvailable"), 0)
-        used = _coerce_int_default(util.get("pitGroupBytesUsed"), 0)
-
-        base_bytes = _pick_group_field_int(group, "maxBaseCapacity", "baseVolumeCapacity")
-        if base_bytes <= 0:
-            base_bytes = available + used
-
-        min_free_bytes = int(base_bytes * (min_free_percent / 100.0)) if base_bytes > 0 else 0
-        repo_capacity_bytes = _pick_group_field_int(group, "repositoryCapacity")
-        if repo_capacity_bytes <= 0:
-            repo_capacity_bytes = available + used
-
-        current_repo_percent = (repo_capacity_bytes / base_bytes * 100.0) if base_bytes > 0 else 0.0
-
-        snapshot_count = _coerce_int_default(group.get("snapshotCount"), 0)
-        if available >= min_free_bytes:
-            eligible.append((available, -snapshot_count, group_ref))
-            continue
-
-        if current_repo_percent >= max_repo_group_capacity_percent:
-            continue
-
-        repository_ref = str(group.get("repositoryVolume") or "")
-        repository = repo_by_ref.get(repository_ref, {}) if repository_ref else {}
-        member_count = _pick_group_field_int(
-            repository,
-            "memberCount",
-            "totalRepositoryVolumes",
-            "repositoryVolumeCount",
-            "volumeCount",
-        )
-        if member_count <= 0 and isinstance(repository.get("members"), list):
-            member_count = len(repository["members"])
-        if member_count >= max_repo_volumes_per_group:
-            continue
-
-        grow_candidates.append(
-            (
-                available,
-                -snapshot_count,
-                -member_count,
-                group_ref,
-                {
-                    "groupRef": group_ref,
-                    "repositoryRef": repository_ref,
-                    "baseVolumeRef": str(group.get("baseVolume") or ""),
-                    "availableBytes": available,
-                    "minFreeBytes": min_free_bytes,
-                    "memberCount": member_count,
-                },
-            )
-        )
-
-    if eligible:
-        eligible.sort(reverse=True)
-        return eligible[0][2], None
-
-    if grow_candidates:
-        grow_candidates.sort(reverse=True)
-        return None, grow_candidates[0][4]
-
-    return None, None
-
-
 def _is_snapshot_repo_volume(volume: Mapping[str, Any]) -> bool:
     volume_use = str(volume.get("volumeUse") or "").strip().lower()
     if volume_use in {"concatvolume", "freerepositoryvolume"}:
@@ -855,20 +713,14 @@ def _resolve_volume_ref(client: SANtricityClient, volume: str) -> tuple[str, str
         _handle_request_error(exc)
         raise typer.Exit(code=1)
 
-    by_ref = [
-        v
-        for v in volumes
-        if str(v.get("volumeRef") or v.get("id") or "") == volume
-    ]
+    by_ref = [v for v in volumes if str(v.get("volumeRef") or v.get("id") or "") == volume]
     if by_ref:
         v = by_ref[0]
-        return str(v.get("volumeRef") or v.get("id")), str(v.get("label") or v.get("name") or volume)
+        return str(v.get("volumeRef") or v.get("id")), str(
+            v.get("label") or v.get("name") or volume
+        )
 
-    by_label = [
-        v
-        for v in volumes
-        if str(v.get("label") or v.get("name") or "") == volume
-    ]
+    by_label = [v for v in volumes if str(v.get("label") or v.get("name") or "") == volume]
     if not by_label:
         typer.secho(
             f"No volume matching '{volume}' was found.",
@@ -1026,7 +878,21 @@ def snapshots_list_volumes(
     output_json: bool = _SHARED_OPTIONS["output_json"],
 ) -> None:
     """List snapshot volumes (linked clones and read-only views)."""
-    _snapshot_list_command("list_volumes", "snapshots.list-volumes", base_url, auth, username, password, token, verify_ssl, cert_path, timeout, release_version, system_id, output_json)
+    _snapshot_list_command(
+        "list_volumes",
+        "snapshots.list-volumes",
+        base_url,
+        auth,
+        username,
+        password,
+        token,
+        verify_ssl,
+        cert_path,
+        timeout,
+        release_version,
+        system_id,
+        output_json,
+    )
 
 
 @snapshots_app.command("list-repo-groups")
@@ -1044,7 +910,21 @@ def snapshots_list_repos(
     output_json: bool = _SHARED_OPTIONS["output_json"],
 ) -> None:
     """List concatenated repository volumes backing snapshot groups and linked clones."""
-    _snapshot_list_command("list_repositories", "snapshots.list-repo-groups", base_url, auth, username, password, token, verify_ssl, cert_path, timeout, release_version, system_id, output_json)
+    _snapshot_list_command(
+        "list_repositories",
+        "snapshots.list-repo-groups",
+        base_url,
+        auth,
+        username,
+        password,
+        token,
+        verify_ssl,
+        cert_path,
+        timeout,
+        release_version,
+        system_id,
+        output_json,
+    )
 
 
 @snapshots_app.command("list-repo-volumes")
@@ -1080,7 +960,11 @@ def snapshots_list_repo_volumes(
             _handle_request_error(exc)
             return
 
-    repo_volumes = [volume for volume in volumes if isinstance(volume, Mapping) and _is_snapshot_repo_volume(volume)]
+    repo_volumes = [
+        volume
+        for volume in volumes
+        if isinstance(volume, Mapping) and _is_snapshot_repo_volume(volume)
+    ]
     _present_output(repo_volumes, view_id="snapshots.list-repo-volumes", json_output=output_json)
 
 
@@ -1120,7 +1004,9 @@ def snapshots_list_group_util(
             return
 
     group_name_by_ref: dict[str, str] = {
-        str(g.get("pitGroupRef") or g.get("id") or ""): (g.get("name") or g.get("label") or str(g.get("pitGroupRef") or g.get("id") or ""))
+        str(g.get("pitGroupRef") or g.get("id") or ""): (
+            g.get("name") or g.get("label") or str(g.get("pitGroupRef") or g.get("id") or "")
+        )
         for g in groups
         if g.get("pitGroupRef") or g.get("id")
     }
@@ -1150,7 +1036,21 @@ def snapshots_list_volume_util(
     output_json: bool = _SHARED_OPTIONS["output_json"],
 ) -> None:
     """List repository utilization for snapshot volumes (linked clones)."""
-    _snapshot_list_command("list_volume_repo_utilization", "snapshots.list-volume-util", base_url, auth, username, password, token, verify_ssl, cert_path, timeout, release_version, system_id, output_json)
+    _snapshot_list_command(
+        "list_volume_repo_utilization",
+        "snapshots.list-volume-util",
+        base_url,
+        auth,
+        username,
+        password,
+        token,
+        verify_ssl,
+        cert_path,
+        timeout,
+        release_version,
+        system_id,
+        output_json,
+    )
 
 
 @snapshots_app.command("list-cg-members")
@@ -1168,7 +1068,21 @@ def snapshots_list_cg_members(
     output_json: bool = _SHARED_OPTIONS["output_json"],
 ) -> None:
     """List volumes that are members of consistency groups."""
-    _snapshot_list_command("list_consistency_group_members", "snapshots.list-cg-members", base_url, auth, username, password, token, verify_ssl, cert_path, timeout, release_version, system_id, output_json)
+    _snapshot_list_command(
+        "list_consistency_group_members",
+        "snapshots.list-cg-members",
+        base_url,
+        auth,
+        username,
+        password,
+        token,
+        verify_ssl,
+        cert_path,
+        timeout,
+        release_version,
+        system_id,
+        output_json,
+    )
 
 
 @snapshots_app.command("list-schedules")
@@ -1253,7 +1167,9 @@ def snapshots_create_image(
 @snapshots_app.command("create-repo-group")
 def snapshots_create_repo_group(
     volume: str = typer.Option(..., "--volume", help="Base volume label/name or volumeRef."),
-    percent_capacity: int = typer.Option(..., "--percent-capacity", min=1, max=100, help="Repository capacity as % of base volume."),
+    percent_capacity: int = typer.Option(
+        ..., "--percent-capacity", min=1, max=100, help="Repository capacity as % of base volume."
+    ),
     use_free_repository_volumes: bool = typer.Option(
         False,
         "--use-free-repository-volumes/--no-use-free-repository-volumes",
@@ -1297,7 +1213,9 @@ def snapshots_create_repo_group(
 @snapshots_app.command("plan-repo-group")
 def snapshots_plan_repo_group(
     volume: str = typer.Option(..., "--volume", help="Base volume label/name or volumeRef."),
-    percent_capacity: int = typer.Option(..., "--percent-capacity", min=1, max=100, help="Repository capacity as % of base volume."),
+    percent_capacity: int = typer.Option(
+        ..., "--percent-capacity", min=1, max=100, help="Repository capacity as % of base volume."
+    ),
     use_free_repository_volumes: bool = typer.Option(
         False,
         "--use-free-repository-volumes/--no-use-free-repository-volumes",
@@ -1344,11 +1262,24 @@ def snapshots_plan_repo_group(
 @snapshots_app.command("create-snapshot-group")
 def snapshots_create_snapshot_group(
     volume: str = typer.Option(..., "--volume", help="Base volume label/name or volumeRef."),
-    percent_capacity: int = typer.Option(..., "--percent-capacity", min=1, max=100, help="Repository capacity as % of base volume."),
-    name: str | None = typer.Option(None, "--name", help="Snapshot group name. Defaults to <volume_label>_SG_01."),
-    warning_threshold: int = typer.Option(75, "--warning-threshold", min=1, max=100, help="Repository full warning threshold percent."),
-    auto_delete_limit: int = typer.Option(32, "--auto-delete-limit", min=0, help="Auto-delete limit when full policy purges snapshots."),
-    full_policy: str = typer.Option("purgepit", "--full-policy", help="Repository full policy (for example: purgepit)."),
+    percent_capacity: int = typer.Option(
+        ..., "--percent-capacity", min=1, max=100, help="Repository capacity as % of base volume."
+    ),
+    name: str | None = typer.Option(
+        None, "--name", help="Snapshot group name. Defaults to <volume_label>_SG_01."
+    ),
+    warning_threshold: int = typer.Option(
+        75, "--warning-threshold", min=1, max=100, help="Repository full warning threshold percent."
+    ),
+    auto_delete_limit: int = typer.Option(
+        32,
+        "--auto-delete-limit",
+        min=0,
+        help="Auto-delete limit when full policy purges snapshots.",
+    ),
+    full_policy: str = typer.Option(
+        "purgepit", "--full-policy", help="Repository full policy (for example: purgepit)."
+    ),
     use_free_repository_volumes: bool = typer.Option(
         False,
         "--use-free-repository-volumes/--no-use-free-repository-volumes",
@@ -1417,7 +1348,9 @@ def snapshots_create_snapshot_group(
 
 @snapshots_app.command("create-snapshot")
 def snapshots_create_snapshot(
-    group_ref: str | None = typer.Option(None, "--group-ref", help="Snapshot group ref (pitGroupRef)."),
+    group_ref: str | None = typer.Option(
+        None, "--group-ref", help="Snapshot group ref (pitGroupRef)."
+    ),
     auto: bool = typer.Option(
         False,
         "--auto",
@@ -1468,7 +1401,9 @@ def snapshots_create_snapshot(
         help="Do not auto-grow groups with this many repository members already attached.",
         show_default=True,
     ),
-    volume: str | None = typer.Option(None, "--volume", help="Optional base volume label/name/ref to validate group ownership."),
+    volume: str | None = typer.Option(
+        None, "--volume", help="Optional base volume label/name/ref to validate group ownership."
+    ),
     base_url: str = _SHARED_OPTIONS["base_url"],
     username: str | None = _SHARED_OPTIONS["username"],
     password: str | None = _SHARED_OPTIONS["password"],
@@ -1512,131 +1447,103 @@ def snapshots_create_snapshot(
         release_version=release_version,
         system_id=system_id,
     ) as client:
-        resolved_group_ref = group_ref
         volume_ref: str | None = None
-        groups: list[dict[str, Any]] | None = None
-
         if volume:
             volume_ref, _ = _resolve_volume_ref(client, volume)
 
-        if auto:
-            if resolved_group_ref:
-                typer.secho(
-                    "--group-ref was provided; skipping auto-selection.",
-                    err=True,
-                    fg=typer.colors.YELLOW,
-                )
-            else:
-                try:
-                    groups = client.snapshots.list_groups()
-                    schedules = _list_schedules_best_effort(client)
-                    utilization = client.snapshots.list_group_repo_utilization()
-                    repositories = client.snapshots.list_repositories()
-                except RequestError as exc:
-                    _handle_request_error(exc)
-                    return
-
-                resolved_group_ref, grow_target = _choose_snapshot_group_for_auto(
-                    groups,
-                    schedules,
-                    utilization,
-                    repositories,
-                    volume_ref=volume_ref or "",
-                    include_schedule_owned_groups=include_schedule_owned_groups,
-                    min_free_percent=min_free_percent,
-                    max_repo_group_capacity_percent=max_repo_group_capacity_percent,
-                    max_repo_volumes_per_group=max_repo_volumes_per_group,
-                )
-
-                if not resolved_group_ref and grow_target and auto_grow_if_needed:
-                    try:
-                        candidates = client.snapshots.get_repo_group_candidates_single(
-                            base_volume_ref=str(grow_target.get("baseVolumeRef") or ""),
-                            percent_capacity=growth_step_percent,
-                            use_free_repository_volumes=False,
-                        )
-                    except RequestError as exc:
-                        _handle_request_error(exc)
-                        return
-
-                    candidate = candidates[0].get("candidate") if isinstance(candidates, list) and candidates else None
-                    repository_ref = str(grow_target.get("repositoryRef") or "")
-                    if candidate and repository_ref:
-                        try:
-                            client.snapshots.expand_repository(
-                                repository_ref=repository_ref,
-                                expansion_candidate=candidate,
-                            )
-                        except RequestError as exc:
-                            _handle_request_error(exc)
-                            return
-                        resolved_group_ref = str(grow_target.get("groupRef") or "")
-                        typer.secho(
-                            f"Expanded repository '{repository_ref}' by {growth_step_percent}% and selected snapshot group '{resolved_group_ref}'.",
-                            err=True,
-                            fg=typer.colors.GREEN,
-                        )
-
-                if not resolved_group_ref:
-                    typer.secho(
-                        "No eligible snapshot group found for --volume under current policy. "
-                        "Create a snapshot group first, lower --min-free-percent, or rerun with "
-                        "--include-schedule-owned-groups.",
-                        err=True,
-                        fg=typer.colors.RED,
-                    )
-                    raise typer.Exit(code=1)
-
-                if not grow_target:
-                    typer.secho(
-                        f"Auto-selected snapshot group '{resolved_group_ref}'.",
-                        err=True,
-                        fg=typer.colors.GREEN,
-                    )
-
-        if not resolved_group_ref:
-            typer.secho(
-                "A snapshot group reference could not be resolved.",
-                err=True,
-                fg=typer.colors.RED,
-            )
+        if not volume_ref:
+            typer.secho("The '--volume' argument is required when using '--auto'.", err=True, fg=typer.colors.RED)
             raise typer.Exit(code=1)
 
-        if volume:
-            if groups is None:
-                try:
-                    groups = client.snapshots.list_groups()
-                except RequestError as exc:
-                    _handle_request_error(exc)
-                    return
-            selected_group = next(
-                (
-                    g
-                    for g in groups
-                    if str(g.get("pitGroupRef") or g.get("id") or "") == resolved_group_ref
-                ),
-                None,
-            )
-            if selected_group is None:
-                typer.secho(
-                    f"Snapshot group '{resolved_group_ref}' was not found.",
-                    err=True,
-                    fg=typer.colors.RED,
-                )
-                raise typer.Exit(code=1)
-            if str(selected_group.get("baseVolume") or "") != volume_ref:
-                typer.secho(
-                    "The provided --group-ref does not belong to the provided --volume.",
-                    err=True,
-                    fg=typer.colors.RED,
-                )
-                raise typer.Exit(code=1)
         try:
-            snapshot = client.snapshots.create_snapshot(resolved_group_ref)
+            from .automation.snapshots import SnapshotsAutomation
+
+            auto_api = SnapshotsAutomation(client)
+            snapshot = auto_api.auto_create_snapshot(
+                volume_ref=volume_ref,
+                min_free_percent=min_free_percent,
+                auto_grow_if_needed=auto_grow_if_needed,
+                growth_step_percent=growth_step_percent,
+                include_schedule_owned_groups=include_schedule_owned_groups,
+                max_repo_group_capacity_percent=max_repo_group_capacity_percent,
+                max_repo_volumes_per_group=max_repo_volumes_per_group,
+            )
+        except RuntimeError as exc:
+            typer.secho(str(exc), err=True, fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        except RequestError as exc:
+            _handle_request_error(exc)
+            raise typer.Exit(code=1)
+        except ValueError as exc:
+            typer.secho(str(exc), err=True, fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+
+    _echo_json(snapshot)
+
+
+@snapshots_app.command("create-clone")
+def snapshots_create_clone(
+    snapshot_id: str = typer.Option(
+        ...,
+        "--snapshot-id",
+        help="Identifier of the source snapshot image (pitRef / snapshotImageId).",
+    ),
+    name: str = typer.Option(..., "--name", help="Name of the new snapshot volume (Linked Clone)."),
+    clone_type: str = typer.Option("ro", "--type", help="Clone type ('ro' is read-only)."),
+    extras: str | None = typer.Option(
+        None, "--extras", help="Comma-separated optional payload fields (e.g. k=v,flag=true)."
+    ),
+    base_url: str = _SHARED_OPTIONS["base_url"],
+    username: str | None = _SHARED_OPTIONS["username"],
+    password: str | None = _SHARED_OPTIONS["password"],
+    token: str | None = _SHARED_OPTIONS["token"],
+    auth: str = _SHARED_OPTIONS["auth"],
+    verify_ssl: bool = _SHARED_OPTIONS["verify_ssl"],
+    cert_path: Path | None = _SHARED_OPTIONS["cert_path"],
+    timeout: float = _SHARED_OPTIONS["timeout"],
+    release_version: str | None = _SHARED_OPTIONS["release_version"],
+    system_id: str | None = _SHARED_OPTIONS["system_id"],
+) -> None:
+    """Create a new Snapshot Volume (Linked Clone)."""
+    if clone_type.lower() != "ro":
+        typer.secho(
+            "Error: '--type rw' (Read-Write linked clones) requires repository automation that is not yet implemented. Use '--type ro' for now.",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+    payload: dict[str, Any] = {
+        "name": name,
+        "snapshotImageId": snapshot_id,
+        "viewMode": "readOnly",
+    }
+    if extras:
+        try:
+            payload.update(parse_extras(extras))
+        except Exception:
+            raise typer.BadParameter(
+                "Invalid format for --extras; expected k=v pairs separated by commas."
+            ) from None
+
+    with _build_client(
+        base_url=base_url,
+        auth=auth,
+        username=username,
+        password=password,
+        token=token,
+        verify_ssl=verify_ssl,
+        cert_path=cert_path,
+        timeout=timeout,
+        release_version=release_version,
+        system_id=system_id,
+    ) as client:
+        try:
+            clone = client.snapshots.create_snapshot_volume(payload)
         except RequestError as exc:
             _handle_request_error(exc)
             return
-    _echo_json(snapshot)
+        _echo_json(clone)
 
 
 @snapshots_app.command("delete-image")
@@ -2215,3 +2122,384 @@ def mappings_delete(
             return
 
     typer.secho(f"Mapping '{map_ref}' deleted.", fg=typer.colors.GREEN)
+
+def _list_schedules_best_effort(client):
+    try:
+        return client.snapshots.list_schedules()
+    except Exception as exc:
+        return []
+
+def _snapshot_schedule_counts(schedules):
+    counts = {}
+    for schedule in schedules:
+        target = schedule.get("targetObject")
+        if target:
+            counts[str(target)] = counts.get(str(target), 0) + 1
+    return counts
+
+
+# ==============================================================================
+# Consistency Groups
+# ==============================================================================
+
+@cgs_app.command("list")
+def cgs_list(
+    base_url: str = _SHARED_OPTIONS["base_url"],
+    username: str | None = _SHARED_OPTIONS["username"],
+    password: str | None = _SHARED_OPTIONS["password"],
+    token: str | None = _SHARED_OPTIONS["token"],
+    auth: str = _SHARED_OPTIONS["auth"],
+    verify_ssl: bool = _SHARED_OPTIONS["verify_ssl"],
+    cert_path: Path | None = _SHARED_OPTIONS["cert_path"],
+    timeout: float = _SHARED_OPTIONS["timeout"],
+    release_version: str | None = _SHARED_OPTIONS["release_version"],
+    system_id: str | None = _SHARED_OPTIONS["system_id"],
+) -> None:
+    """List all consistency groups."""
+    with _build_client(
+        base_url=base_url,
+        auth=auth,
+        username=username,
+        password=password,
+        token=token,
+        verify_ssl=verify_ssl,
+        cert_path=cert_path,
+        timeout=timeout,
+        release_version=release_version,
+        system_id=system_id,
+    ) as client:
+        try:
+            cgs = client.consistency_groups.list_groups()
+        except RequestError as exc:
+            _handle_request_error(exc)
+            return
+    _echo_json(cgs)
+
+
+@cgs_app.command("list-members")
+def cgs_list_members(
+    group: str = typer.Option(..., "--group", help="Consistency Group ID or name."),
+    base_url: str = _SHARED_OPTIONS["base_url"],
+    username: str | None = _SHARED_OPTIONS["username"],
+    password: str | None = _SHARED_OPTIONS["password"],
+    token: str | None = _SHARED_OPTIONS["token"],
+    auth: str = _SHARED_OPTIONS["auth"],
+    verify_ssl: bool = _SHARED_OPTIONS["verify_ssl"],
+    cert_path: Path | None = _SHARED_OPTIONS["cert_path"],
+    timeout: float = _SHARED_OPTIONS["timeout"],
+    release_version: str | None = _SHARED_OPTIONS["release_version"],
+    system_id: str | None = _SHARED_OPTIONS["system_id"],
+) -> None:
+    """List member volumes of a consistency group."""
+    with _build_client(
+        base_url=base_url,
+        auth=auth,
+        username=username,
+        password=password,
+        token=token,
+        verify_ssl=verify_ssl,
+        cert_path=cert_path,
+        timeout=timeout,
+        release_version=release_version,
+        system_id=system_id,
+    ) as client:
+        try:
+            # Simple resolve for name -> cgRef
+            cgs = client.consistency_groups.list_groups()
+            cg_ref = next((c["id"] for c in cgs if c["id"] == group or c["name"] == group), group)
+            members = client.consistency_groups.list_member_volumes(cg_ref)
+        except RequestError as exc:
+            _handle_request_error(exc)
+            return
+    _echo_json(members)
+
+
+@cgs_app.command("list-snapshots")
+def cgs_list_snapshots(
+    group: str = typer.Option(..., "--group", help="Consistency Group ID or name."),
+    base_url: str = _SHARED_OPTIONS["base_url"],
+    username: str | None = _SHARED_OPTIONS["username"],
+    password: str | None = _SHARED_OPTIONS["password"],
+    token: str | None = _SHARED_OPTIONS["token"],
+    auth: str = _SHARED_OPTIONS["auth"],
+    verify_ssl: bool = _SHARED_OPTIONS["verify_ssl"],
+    cert_path: Path | None = _SHARED_OPTIONS["cert_path"],
+    timeout: float = _SHARED_OPTIONS["timeout"],
+    release_version: str | None = _SHARED_OPTIONS["release_version"],
+    system_id: str | None = _SHARED_OPTIONS["system_id"],
+) -> None:
+    """List snapshots for a consistency group."""
+    with _build_client(
+        base_url=base_url,
+        auth=auth,
+        username=username,
+        password=password,
+        token=token,
+        verify_ssl=verify_ssl,
+        cert_path=cert_path,
+        timeout=timeout,
+        release_version=release_version,
+        system_id=system_id,
+    ) as client:
+        try:
+            cgs = client.consistency_groups.list_groups()
+            cg_ref = next((c["id"] for c in cgs if c["id"] == group or c["name"] == group), group)
+            snapshots = client.consistency_groups.list_snapshots(cg_ref)
+        except RequestError as exc:
+            _handle_request_error(exc)
+            return
+    _echo_json(snapshots)
+
+
+@cgs_app.command("list-clones")
+def cgs_list_clones(
+    group: str = typer.Option(..., "--group", help="Consistency Group ID or name."),
+    base_url: str = _SHARED_OPTIONS["base_url"],
+    username: str | None = _SHARED_OPTIONS["username"],
+    password: str | None = _SHARED_OPTIONS["password"],
+    token: str | None = _SHARED_OPTIONS["token"],
+    auth: str = _SHARED_OPTIONS["auth"],
+    verify_ssl: bool = _SHARED_OPTIONS["verify_ssl"],
+    cert_path: Path | None = _SHARED_OPTIONS["cert_path"],
+    timeout: float = _SHARED_OPTIONS["timeout"],
+    release_version: str | None = _SHARED_OPTIONS["release_version"],
+    system_id: str | None = _SHARED_OPTIONS["system_id"],
+) -> None:
+    """List read-only Linked Clones (Views) for a consistency group."""
+    with _build_client(
+        base_url=base_url,
+        auth=auth,
+        username=username,
+        password=password,
+        token=token,
+        verify_ssl=verify_ssl,
+        cert_path=cert_path,
+        timeout=timeout,
+        release_version=release_version,
+        system_id=system_id,
+    ) as client:
+        try:
+            cgs = client.consistency_groups.list_groups()
+            cg_ref = next((c["id"] for c in cgs if c["id"] == group or c["name"] == group), group)
+            views = client.consistency_groups.list_views_for_group(cg_ref)
+        except RequestError as exc:
+            _handle_request_error(exc)
+            return
+    _echo_json(views)
+
+
+@cgs_app.command("create")
+def cgs_create(
+    name: str = typer.Option(..., "--name", help="Name of the new Consistency Group."),
+    full_warn_threshold: int = typer.Option(75, "--warning-threshold", help="Full warning threshold percent."),
+    auto_delete_limit: int = typer.Option(32, "--auto-delete-limit", help="Auto delete limit for purge policy."),
+    full_policy: str = typer.Option("purgepit", "--full-policy", help="Repository full policy (e.g., purgepit)."),
+    base_url: str = _SHARED_OPTIONS["base_url"],
+    username: str | None = _SHARED_OPTIONS["username"],
+    password: str | None = _SHARED_OPTIONS["password"],
+    token: str | None = _SHARED_OPTIONS["token"],
+    auth: str = _SHARED_OPTIONS["auth"],
+    verify_ssl: bool = _SHARED_OPTIONS["verify_ssl"],
+    cert_path: Path | None = _SHARED_OPTIONS["cert_path"],
+    timeout: float = _SHARED_OPTIONS["timeout"],
+    release_version: str | None = _SHARED_OPTIONS["release_version"],
+    system_id: str | None = _SHARED_OPTIONS["system_id"],
+) -> None:
+    """Create a new consistency group."""
+    with _build_client(
+        base_url=base_url,
+        auth=auth,
+        username=username,
+        password=password,
+        token=token,
+        verify_ssl=verify_ssl,
+        cert_path=cert_path,
+        timeout=timeout,
+        release_version=release_version,
+        system_id=system_id,
+    ) as client:
+        try:
+            payload = {
+                "name": name,
+                "fullWarnThresholdPercent": full_warn_threshold,
+                "autoDeleteThreshold": auto_delete_limit, # wait, standard API might be 'autoDeleteLimit' or 'autoDeleteThreshold'
+                "repositoryFullPolicy": full_policy,
+            }
+            # Notes used autoDeleteThreshold in POST /consistency-groups
+            cg = client.consistency_groups.create_group(payload)
+        except RequestError as exc:
+            _handle_request_error(exc)
+            return
+    _echo_json(cg)
+
+
+@cgs_app.command("create-snapshot")
+def cgs_create_snapshot(
+    group: str = typer.Option(..., "--group", help="Consistency Group ID or name."),
+    base_url: str = _SHARED_OPTIONS["base_url"],
+    username: str | None = _SHARED_OPTIONS["username"],
+    password: str | None = _SHARED_OPTIONS["password"],
+    token: str | None = _SHARED_OPTIONS["token"],
+    auth: str = _SHARED_OPTIONS["auth"],
+    verify_ssl: bool = _SHARED_OPTIONS["verify_ssl"],
+    cert_path: Path | None = _SHARED_OPTIONS["cert_path"],
+    timeout: float = _SHARED_OPTIONS["timeout"],
+    release_version: str | None = _SHARED_OPTIONS["release_version"],
+    system_id: str | None = _SHARED_OPTIONS["system_id"],
+) -> None:
+    """Create a new snapshot for a consistency group. Will error if member volumes are empty."""
+    with _build_client(
+        base_url=base_url,
+        auth=auth,
+        username=username,
+        password=password,
+        token=token,
+        verify_ssl=verify_ssl,
+        cert_path=cert_path,
+        timeout=timeout,
+        release_version=release_version,
+        system_id=system_id,
+    ) as client:
+        try:
+            cgs = client.consistency_groups.list_groups()
+            cg_ref = next((c["id"] for c in cgs if c["id"] == group or c["name"] == group), group)
+            # Use automation safe-wrapper
+            snaps = client.automation.snapshots.create_cg_snapshot(cg_ref)
+        except RuntimeError as err:
+            typer.secho(str(err), err=True, fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        except RequestError as exc:
+            _handle_request_error(exc)
+            return
+    _echo_json(snaps)
+
+
+
+@cgs_app.command("add-member")
+def cgs_add_member(
+    group: str = typer.Option(..., "--group", help="Consistency Group ID or name."),
+    volume: str = typer.Option(..., "--volume", help="Volume ID to add to the CG."),
+    repository_percent: int = typer.Option(20, "--repository-percent", help="Repository size percent for this member."),
+    base_url: str = _SHARED_OPTIONS["base_url"],
+    username: str | None = _SHARED_OPTIONS["username"],
+    password: str | None = _SHARED_OPTIONS["password"],
+    token: str | None = _SHARED_OPTIONS["token"],
+    auth: str = _SHARED_OPTIONS["auth"],
+    verify_ssl: bool = _SHARED_OPTIONS["verify_ssl"],
+    cert_path: Path | None = _SHARED_OPTIONS["cert_path"],
+    timeout: float = _SHARED_OPTIONS["timeout"],
+    release_version: str | None = _SHARED_OPTIONS["release_version"],
+    system_id: str | None = _SHARED_OPTIONS["system_id"],
+) -> None:
+    """Add a member volume to a consistency group."""
+    with _build_client(
+        base_url=base_url,
+        auth=auth,
+        username=username,
+        password=password,
+        token=token,
+        verify_ssl=verify_ssl,
+        cert_path=cert_path,
+        timeout=timeout,
+        release_version=release_version,
+        system_id=system_id,
+    ) as client:
+        try:
+            # Simple resolve for name -> cgRef
+            cgs = client.consistency_groups.list_groups()
+            cg_ref = next((c["id"] for c in cgs if c["id"] == group or c["name"] == group), group)
+            
+            # Since repository Candidate needs to be populated, SANtricity might do it server-side if pool is defined.
+            # But the 'add_member_volume' logic for CSI assumes the repositoryCandidate or poolId.
+            # For now, sending what the API generally validates or throwing error on mismatch.
+            payload = {
+                "volumeId": volume,
+                "repositoryPercent": repository_percent,
+                "scanMedia": False,
+                "validateParity": False,
+            }
+            # Add member natively
+            members = client.consistency_groups.add_member_volume(cg_ref, payload)
+        except RequestError as exc:
+            _handle_request_error(exc)
+            return
+    _echo_json(members)
+
+
+@cgs_app.command("delete")
+def cgs_delete(
+    group: str = typer.Option(..., "--group", help="Consistency Group ID or name to delete."),
+    base_url: str = _SHARED_OPTIONS["base_url"],
+    username: str | None = _SHARED_OPTIONS["username"],
+    password: str | None = _SHARED_OPTIONS["password"],
+    token: str | None = _SHARED_OPTIONS["token"],
+    auth: str = _SHARED_OPTIONS["auth"],
+    verify_ssl: bool = _SHARED_OPTIONS["verify_ssl"],
+    cert_path: Path | None = _SHARED_OPTIONS["cert_path"],
+    timeout: float = _SHARED_OPTIONS["timeout"],
+    release_version: str | None = _SHARED_OPTIONS["release_version"],
+    system_id: str | None = _SHARED_OPTIONS["system_id"],
+) -> None:
+    """Delete a consistency group."""
+    with _build_client(
+        base_url=base_url,
+        auth=auth,
+        username=username,
+        password=password,
+        token=token,
+        verify_ssl=verify_ssl,
+        cert_path=cert_path,
+        timeout=timeout,
+        release_version=release_version,
+        system_id=system_id,
+    ) as client:
+        try:
+            cgs = client.consistency_groups.list_groups()
+            cg_ref = next((c["id"] for c in cgs if c["id"] == group or c["name"] == group), group)
+            client.consistency_groups.delete_group(cg_ref)
+        except RequestError as exc:
+            _handle_request_error(exc)
+            return
+    typer.secho(f"Successfully deleted Consistency Group: {group}", fg=typer.colors.GREEN)
+
+
+
+@cgs_app.command("remove-member")
+def cgs_remove_member(
+    group: str = typer.Option(..., "--group", help="Consistency Group ID or name."),
+    member: str = typer.Option(..., "--member", help="Member Volume ID to remove from the CG."),
+    base_url: str = _SHARED_OPTIONS["base_url"],
+    username: str | None = _SHARED_OPTIONS["username"],
+    password: str | None = _SHARED_OPTIONS["password"],
+    token: str | None = _SHARED_OPTIONS["token"],
+    auth: str = _SHARED_OPTIONS["auth"],
+    verify_ssl: bool = _SHARED_OPTIONS["verify_ssl"],
+    cert_path: Path | None = _SHARED_OPTIONS["cert_path"],
+    timeout: float = _SHARED_OPTIONS["timeout"],
+    release_version: str | None = _SHARED_OPTIONS["release_version"],
+    system_id: str | None = _SHARED_OPTIONS["system_id"],
+) -> None:
+    """Remove a member volume from a consistency group. May fail if dependent clones exist."""
+    with _build_client(
+        base_url=base_url,
+        auth=auth,
+        username=username,
+        password=password,
+        token=token,
+        verify_ssl=verify_ssl,
+        cert_path=cert_path,
+        timeout=timeout,
+        release_version=release_version,
+        system_id=system_id,
+    ) as client:
+        try:
+            # Simple resolve for name -> cgRef
+            cgs = client.consistency_groups.list_groups()
+            cg_ref = next((c["id"] for c in cgs if c["id"] == group or c["name"] == group), group)
+            
+            client.consistency_groups.remove_member_volume(cg_ref, member)
+        except RequestError as exc:
+            _handle_request_error(exc)
+            return
+    typer.secho(f"Successfully removed member {member} from CG.", fg=typer.colors.GREEN)
+

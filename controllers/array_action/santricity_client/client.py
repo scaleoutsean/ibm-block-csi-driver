@@ -20,6 +20,7 @@ from .http import HttpResponse
 from .http import request as http_request
 from .reports import ReportsFacade
 from .resources import (
+    ConsistencyGroupsResource,
     ClonesResource,
     HostsResource,
     InterfacesResource,
@@ -77,6 +78,7 @@ class SANtricityClient:
         self.mappings = VolumeMappingsResource(self)
         self.clones = ClonesResource(self)
         self.system = SystemResource(self)
+        self.consistency_groups = ConsistencyGroupsResource(self)
         self.reports = ReportsFacade(self)
         self.automation = AutomationFacade(self)
 

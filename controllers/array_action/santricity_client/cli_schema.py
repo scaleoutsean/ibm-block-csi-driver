@@ -474,7 +474,7 @@ CLI_TABLE_VIEWS: dict[str, TableView] = {
             Column("Interface", keys=("interface_id",), formatter=_truncate_formatter(max_chars=18)),
             Column("Channel", keys=("channel",), justify="right"),
             Column("Transport", keys=("transport",)),
-            Column("Addr", keys=("ipv4_address", "infiniband_ipv4_address", "roce_v2_ipv4_address")),
+            Column("Addr", keys=("ipv4_address", "infiniband_ipv4_address", "roce_v2_ipv4_address", "node_name")),
             Column("Cmd IPv4", keys=("command_ipv4_address",)),
             Column("NVMe Ready", keys=("is_command_ipv4_ready",), formatter=_bool_formatter, justify="center"),
             Column("Provider", keys=("command_provider",), formatter=_truncate_formatter(max_chars=18)),

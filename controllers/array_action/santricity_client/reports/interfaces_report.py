@@ -160,6 +160,8 @@ HOSTSIDE_INTERFACE_ISCSI: list[FieldMapping] = [
         _convert_speed_string_to_mebibits_per_second,
     ),
     ("iqn", "iqn", _strip_string),
+    ("interfaceData_ethernetData_linkStatus", "link_status", _lower_string),
+    ("interfaceData_ethernetData_linkStatus", "is_link_up", _convert_link_status_to_bool),
     ("controllerId", "controller_id", _strip_string),
     ("interfaceId", "interface_id", _strip_string),
     ("addressId", "address_id", _strip_string),
@@ -215,6 +217,7 @@ HOSTSIDE_INTERFACE_ETHERNET: list[FieldMapping] = [
         _convert_speed_string_to_mebibits_per_second,
     ),
     ("interfaceData_ethernetData_linkStatus", "link_status", _lower_string),
+    ("interfaceData_ethernetData_linkStatus", "is_link_up", _convert_link_status_to_bool),
     ("controllerId", "controller_id", _strip_string),
     ("addressId", "address_id", _strip_string),
     ("id", "id", _strip_string),
@@ -403,9 +406,9 @@ def _apply_controller_details(
         controller = controller_by_key.get(candidate)
         if not controller:
             continue
-        row.setdefault("controller_id", controller.get("controller_id"))
-        row.setdefault("controller_ref", controller.get("controller_ref"))
-        row.setdefault("controller_label", controller.get("controller_label"))
+        for key in ("controller_id", "controller_ref", "controller_label"):
+            if not row.get(key) and controller.get(key):
+                row[key] = controller.get(key)
         return
 
 
@@ -507,6 +510,12 @@ def hostside_interfaces_report(
 
         row = _extract_fields(entry, COMMON_FIELDS)
         row.update(_extract_fields(payload, field_mappings))
+
+        if not row.get("controller_ref"):
+            fallback_ref = _strip_string(payload.get("controllerRef"))
+            if fallback_ref:
+                row["controller_ref"] = fallback_ref
+
         _apply_command_protocol_details(row, entry)
         row["protocol"] = resolved_protocol
         _apply_controller_details(row, controller_by_key)

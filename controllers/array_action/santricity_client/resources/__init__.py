@@ -1,6 +1,7 @@
 """Resource-specific convenience wrappers."""
 
 from .clones import ClonesResource
+from .consistency_groups import ConsistencyGroupsResource
 from .hosts import HostsResource
 from .interfaces import InterfacesResource
 from .mappings import VolumeMappingsResource
@@ -17,5 +18,6 @@ __all__ = [
     "SnapshotsResource",
     "VolumeMappingsResource",
     "ClonesResource",
+    "ConsistencyGroupsResource",
     "SystemResource",
 ]
