@@ -70,6 +70,8 @@ Various thin distributions are not supported, so if you're looking for a SANtric
 
 IBM Block Storage CSI Driver requires an "operator". You may use the pre-configured YAML file for the operator. **Note**: In this fork, the operator and driver are both isolated in the `santricity` namespace by default (unlike upstream which uses `default`).
 
+**NOTE:** if you already have an earlier version of this patched IBM Block CSI that uses the `default` namespace (e.g. version 1.13.1 or early 1.13.2), un-install the CSI driver and operator first, and then install it as per below (which will deploy both the Operator and CSI to the `santricity` namespace).
+
 ```sh
 # Create the namespace first!
 kubectl create namespace santricity
