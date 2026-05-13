@@ -3,7 +3,7 @@ kind: VolumeSnapshotClass
 metadata:
   name: demo-volumesnapshotclass-santricity
 driver: santricity.block.csi.ibm.com
-deletionPolicy: Delete
+deletionPolicy: Retain # Retain protects snapshot persistence if source PV claims are rotated contextually during backup restoratives.
 parameters:
   csi.storage.k8s.io/snapshotter-secret-name: santricity-secret
   csi.storage.k8s.io/snapshotter-secret-namespace: santricity

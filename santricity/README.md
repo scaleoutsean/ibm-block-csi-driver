@@ -177,7 +177,7 @@ kind: VolumeSnapshotClass
 metadata:
   name: demo-volumesnapshotclass-santricity
 driver: santricity.block.csi.ibm.com # different from IBM's driver name
-deletionPolicy: Delete
+deletionPolicy: Retain
 parameters:
   csi.storage.k8s.io/snapshotter-secret-name: santricity-secret
   csi.storage.k8s.io/snapshotter-secret-namespace: santricity
