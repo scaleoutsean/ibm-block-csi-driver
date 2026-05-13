@@ -2,13 +2,15 @@
 
 This directory contains documentation and sample configurations for using the IBM Block CSI Driver with NetApp SANtricity storage arrays (E-Series). 
 
-What **is** this thing? See [this blog post](https://scaleoutsean.github.io/2026/02/26/ibm-block-storage-cis-driver-santricity-fork.html).
+What **is** this thing? See [this blog post](https://scaleoutsean.github.io/2026/02/26/ibm-block-storage-cis-driver-santricity-fork.html). There are other ways to provision SANtricity to Kubernetes - please see this [Overview of E-Series CSI drivers](https://scaleoutsean.github.io/2026/01/20/kubernetes-netapp-eseries-santricity-csi.html) for more.
 
 **WARNING:** this CSI driver uses a minimally changed `CSIDriver` object name in `./common/config.yaml` to avoid conflicts with upstream CSI driver name (if installed in the same Kuberntes cluster) and at the same time credit upstream authors (the link still points to ibm.com). This fork is **not associated with, or supported by, IBM**.
 
 ## Capabilities
 
 The IBM Block Storage CSI driver documentation page [lists features and capabilities](https://www.ibm.com/docs/en/stg-block-csi-driver/1.13.0?topic=requirements-features-capabilities) in a more descriptive way.
+
+As mentioned above, this *minimal* patch seeks to avoid adding features (and bugs) that upstream does not have. Our objective is simple - make IBM Block Storage CSI driver work with SANtricity and take advantage of the features upstream has and integration testing they do.
 
 ### CSI RPC Capabilities
 
@@ -34,7 +36,7 @@ These are the capabilities the driver explicitly reports to Kubernetes during th
 - Supported Connectivity Protocols
 
 The protocols supported by the driver (iSCSI, FC, NVMe) are defined in the configuration and implemented via the storage mediators:
-- Connectivity protocols - iscsi, fc, nvme_over_fc, and our new nvme_over_roce
+- Connectivity protocols - iscsi, fc, nvme_over_fc, and (addition in this patch) nvme_over_roce
 
 If you use this driver, desire additional features already implemented in upstream driver and can assist with debugging (or development), create a feature request in Issues or ping me on X.
 
@@ -57,6 +59,14 @@ Previously we used to run "`make vendor-santricity`" to clone the latest client 
     ```
 
 ## Installation 
+
+### Kubernetes distribution support
+
+Please note that IBM Block Storage CSI supports only vanilla Kubernetes and OpenShift. Find the details in "supported orchestrators" list in the [official documentation](https://www.ibm.com/docs/en/stg-block-csi-driver).
+
+Various thin distributions are not supported, so if you're looking for a SANtricity CSI driver for [MicroK8s](https://scaleoutsean.github.io/2026/05/12/microk8s-kubernetes-netapp-eseries-santricity-csi.html), k3s and similar, check out [SANtricity CSI](https://github.com/scaleoutsean/santricity-go) is recommended.
+
+### Operator-based deployment
 
 IBM Block Storage CSI Driver requires an "operator". You may use pre-configured YAML files.
 
