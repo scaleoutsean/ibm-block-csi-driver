@@ -88,6 +88,9 @@ kubectl wait --for=condition=Established --timeout=120s crd/ibmblockcsis.csi.ibm
 If you used own images, change image locations in this file first. If you're using pre-built, run this step.
 
 ```sh
+# Deploy the standalone CSIDriver object (so K8s and tools like Kasten K10 recognize our custom name)
+kubectl apply -f ./deploy/santricity-solidfire/csidriver-santricity.yaml
+
 kubectl apply -f ./deploy/santricity-solidfire/csi.ibm.com_v1_ibmblockcsi_cr.yaml
 ```
 
