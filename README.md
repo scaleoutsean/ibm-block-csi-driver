@@ -1,9 +1,11 @@
 # IBM block storage CSI driver with NetApp SANtricity patch
 
-This is a clone repository of IBM Block CSI driver **patched for NetApp SANtricity** 11.9 and 12.0, targeting NVMe/RoCE and iSCSI.
+This is a clone repository of IBM Block CSI driver **patched for NetApp SANtricity** (E-Series arrays) version 11.90 and 12.0 and primarily targeting NVMe/RoCE and iSCSI.
 
-- `santricity` branch (default branch) 
-- Documentation: see [/santricity](https://github.com/scaleoutsean/ibm-block-csi-driver/tree/santricity/santricity) directory
+- **Default branch**: `santricity`
+- **Documentation**: see [/santricity](https://github.com/scaleoutsean/ibm-block-csi-driver/tree/santricity/santricity) directory
+
+Bug reports (including on Fibre Channel) or pull requests are welcome.
 
 Please do not contact IBM for SANtricity-related bugs or features. For issues originating upstream, please head over to [upstream repository](https://github.com/ibm/ibm-block-csi-driver). Upstream README is provided below.
 
