@@ -105,6 +105,8 @@ The driver supports two types of SANtricity storage entities: **Traditional Volu
 - Traditional ("classic") disk groups: rigid capacity "islands" with very predictable behavior and granular (precise) capacity allocation. Suitable for many small (<32GB) volumes with specific requirements
 - DDP: flexible "lakes" of capacity with dual volume RAID type (RAID 10 and RAID 6) capability. Has coarse allocation (~4GiB increments), otherwise recommended over classic disk groups
 
+Various YAML examples are available in `./deploy/santricity-solidfire/`, but the main ones are shared below.
+
 ### 1. Traditional Volume Groups (RAID 1/5/6)
 
 Traditional groups define the RAID level at the group level. Volumes created in these groups inherit the group's RAID properties. Do **not** specify `SpaceEfficiency` in the `StorageClass` with classic RAID.
@@ -275,6 +277,8 @@ Locate the `csi-provisioner` container in the open editor block and add the new 
 
 ## Update
 
+Note: if your current (older) IBM Block CSI with SANtricity patch runs in the `default` namespace, uninstall it first, and deploy anew in the `santricty` namespace. Below applies to the situation where the driver uses the `santricity` namespace.
+
 Update the Controller (StatefulSet):
 
 ```sh
@@ -295,7 +299,7 @@ kubectl delete -f ./deploy/santricity-solidfire/csi.ibm.com_v1_ibmblockcsi_cr.ya
 kubectl apply -f ./deploy/santricity-solidfire/csi.ibm.com_v1_ibmblockcsi_cr.yaml
 ```
 
-When upgrading, you may want to make sure the images did get refreshed, especially if tags remained the same (e.g. `:latest`).
+When upgrading, you may want to make sure the images did get refreshed, especially if tags remained the same (e.g. `:latest`). You may specify the unique hashtag instead or "always" pull latest image.
 
 ## Testing
 
