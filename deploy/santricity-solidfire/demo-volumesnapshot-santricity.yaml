@@ -1,0 +1,8 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: demo-volumesnapshot-santricity
+spec:
+  volumeSnapshotClassName: demo-volumesnapshotclass-santricity
+  source:
+    persistentVolumeClaimName: demo-pvc-santricity

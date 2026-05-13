@@ -1,0 +1,14 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: demo-volumesnapshotclass-solidfire
+driver: santricity.block.csi.ibm.com
+deletionPolicy: Delete
+parameters:
+  pool: demo-pool                    # Optional. Use to create the snapshot on a different pool than the source.
+  SpaceEfficiency: thin              # Optional. Use to create the snapshot with a different space efficiency than the source.
+  snapshot_name_prefix: demo-prefix  # Optional.
+  virt_snap_func: "false"            # Optional. Values true/false. The default is false.
+
+  csi.storage.k8s.io/snapshotter-secret-name: solidfire-secret
+  csi.storage.k8s.io/snapshotter-secret-namespace: default

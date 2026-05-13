@@ -160,11 +160,11 @@ A minimal `VolumeSnapshotClass` for SANtricity arrays should look like this:
 apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshotClass
 metadata:
-  name: demo-volumesnapshotclass
+  name: demo-volumesnapshotclass-santricity
 driver: santricity.block.csi.ibm.com # different from IBM's driver name
 deletionPolicy: Delete
 parameters:
-  csi.storage.k8s.io/snapshotter-secret-name: demo-secret
+  csi.storage.k8s.io/snapshotter-secret-name: santricity-secret
   csi.storage.k8s.io/snapshotter-secret-namespace: default
 
   # Optional: initial snapshot repository group size, as % of base volume.
@@ -186,11 +186,11 @@ You can then create snapshots by referencing this class:
 apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshot
 metadata:
-  name: demo-volumesnapshot
+  name: demo-volumesnapshot-santricity
 spec:
-  volumeSnapshotClassName: demo-volumesnapshotclass
+  volumeSnapshotClassName: demo-volumesnapshotclass-santricity
   source:
-    persistentVolumeClaimName: demo-pvc-file-system
+    persistentVolumeClaimName: demo-pvc-santricity
 ```
 
 ## Call Home and Privacy

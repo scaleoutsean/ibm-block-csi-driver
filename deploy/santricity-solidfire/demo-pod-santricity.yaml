@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pvc-mounter
+spec:
+  containers:
+  - name: app
+    image: docker.io/velero/velero
+    command: ["sh","-c","while true; do df -h /data; sleep 300; done"]
+    volumeMounts:
+    - name: data
+      mountPath: /data
+  volumes:
+  - name: data
+    persistentVolumeClaim:
+      claimName: demo-pvc-santricity
