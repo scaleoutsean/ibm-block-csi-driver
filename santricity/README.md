@@ -46,7 +46,7 @@ To build the driver with SANtricity support, you must vendor the `santricity-cli
 
 If you don't want to build your own, skip to **Installation**.
 
-Previously we used to run "`make vendor-santricity`" to clone the latest client library from [scaleoutsean/santricity-client](https://github.com/scaleoutsean/santricity-client) into the local source tree, but because IBM Block Driver CSI runs on outdated Python 3.9, this has proven very brittle. This patch now includes manually integrated source code from SANtricity Client library.
+We use "`make vendor-santricity`" to clone a recent client library from [scaleoutsean/santricity-client](https://github.com/scaleoutsean/santricity-client) into the local source tree and patch it because IBM Block Driver CSI runs on outdated Python 3.9.
 
 1.  **Build the Controller image**:
     ```bash
