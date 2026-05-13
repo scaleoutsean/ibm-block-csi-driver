@@ -103,6 +103,10 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
             if source_type == servers_settings.SNAPSHOT_TYPE_NAME and source_ids:
                 snapshot_image_id = source_ids.uid if source_ids.uid else source_ids.internal_id
                 
+                # Check if K8s concatenated internal_id;strong_id via the utility splitter
+                if snapshot_image_id and ';' in snapshot_image_id:
+                    snapshot_image_id = snapshot_image_id.split(';')[0]
+                    
                 # If K8s passed a Group ID (330...), map it back to the most recent Image ID (340...)
                 if snapshot_image_id.startswith("33"):
                     images = self.client._client.snapshots.list_all_images()
