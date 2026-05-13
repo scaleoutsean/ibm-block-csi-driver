@@ -2,14 +2,18 @@ kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
   name: demo-storageclass-solidfire
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"   # Set to "true" to make this the default StorageClass. Only one default StorageClass should exist per cluster.
+    # k10.kasten.io/is-snapshot-class: "true" # Uncomment for SC backup with Kasten K10  
 provisioner: santricity.block.csi.ibm.com
 reclaimPolicy: Delete  # Explicit default to avoid retained volumes when PVCs are removed
+allowVolumeExpansion: true
 parameters:
   pool: default
   # io_group: demo-iogrp             # Optional.
   # volume_group: demo-volumegroup   # Optional.
   # SpaceEfficiency: thin            # Optional.
-  volume_name_prefix:                # Optional. Volume name prefix. Default is "ibm_csi".
+  volume_name_prefix:                # Optional. Volume name prefix. Default is "csi".
   # virt_snap_func: "false"          # Optional. Values true/false. The default is false.
 
   csi.storage.k8s.io/fstype: xfs     # Optional. Values ext4/xfs. The default is ext4.

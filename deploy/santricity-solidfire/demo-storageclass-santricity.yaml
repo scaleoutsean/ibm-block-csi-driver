@@ -2,11 +2,14 @@ kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
   name: demo-storageclass-santricity
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"   # Set to "true" to make this the default StorageClass. Only one default StorageClass should exist per cluster.
+    # k10.kasten.io/is-snapshot-class: "true"                # Uncomment for SC backup with Kasten K10
 provisioner: santricity.block.csi.ibm.com
-reclaimPolicy: Delete
+reclaimPolicy: Delete                # Set value to 'Retain' if snapshot-based "backup" is desired (Velero, Kasten...).
 parameters:
   pool: "data"                       # SANtricity Pool ID or Pool Label (e.g. "040000006D039EA0004D008700000F55693865CC" or "Pool_01")
-  # SpaceEfficiency: raid6           # (Optional) SANtricity RAID level hint (raid1, raid5, raid6, raid10)
+  # SpaceEfficiency: raid6           # (Optional) SANtricity RAID level hint (raid1, raid6) for DDP pools. 
                                      # Defaults to raid6 for DDP pools if not specified. Volumes on traditional pools (VGs) follow the VG's RAID level.
   volume_name_prefix: csi            # (Optional)
   

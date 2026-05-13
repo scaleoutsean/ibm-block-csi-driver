@@ -5,7 +5,7 @@ metadata:
 spec:
   containers:
   - name: app
-    image: docker.io/velero/velero
+    image: docker.io/debian:trixie-backports
     command: ["sh","-c","while true; do df -h /data; sleep 30; done"]
     volumeMounts:
     - name: data
