@@ -563,7 +563,16 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
                     return self._to_snapshot_object(img_data, vol_data)
         return None
 
-    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func, partition_name=None):
+    def create_snapshot(
+        self,
+        volume_id,
+        snapshot_name,
+        space_efficiency,
+        pool,
+        is_virt_snap_func,
+        partition_name=None,
+        initial_repo_group_size_pct=None,
+    ):
         import logging
         logger = logging.getLogger(__name__)
         logger.info(f"Creating snapshot '{snapshot_name}' for volume '{volume_id}'")
@@ -591,6 +600,7 @@ class SANtricityArrayMediator(ArrayMediatorAbstract):
             include_schedule_owned_groups=True,
             max_repo_group_capacity_percent=200.0,
             max_repo_volumes_per_group=16,
+            initial_repo_group_size_pct=initial_repo_group_size_pct,
         )
         
         vol_data = self.client.get_volume(volume_id)

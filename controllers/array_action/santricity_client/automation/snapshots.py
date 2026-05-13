@@ -152,6 +152,7 @@ class SnapshotsAutomation:
         include_schedule_owned_groups: bool = True,
         max_repo_group_capacity_percent: float = 200.0,
         max_repo_volumes_per_group: int = 16,
+        initial_repo_group_size_pct: int | None = 20,
     ) -> dict[str, Any]:
         """Automatically create a snapshot image for a volume.
         
@@ -196,9 +197,10 @@ class SnapshotsAutomation:
         if not resolved_group_ref:
             # We must create a new snapshot group for this volume!
             logger.info("No eligible snapshot group found for volume {%s}, creating a new one.", volume_ref)
+            effective_initial_repo_group_size_pct = int(initial_repo_group_size_pct or 20)
             candidates = self._client.snapshots.get_repo_group_candidates_single(
                 base_volume_ref=volume_ref,
-                percent_capacity=20, # Default initial capacity for new groups
+                percent_capacity=effective_initial_repo_group_size_pct,
                 concat_volume_type="snapshot"
             )
             if not candidates:

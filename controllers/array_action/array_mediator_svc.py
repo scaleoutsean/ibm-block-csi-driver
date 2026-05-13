@@ -1161,7 +1161,16 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         raise RuntimeError('could not find a volume for {} in site {}'.format(volume_name, pool_site_name))
 
     @register_csi_plugin()
-    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func, partition_name=None):
+    def create_snapshot(
+        self,
+        volume_id,
+        snapshot_name,
+        space_efficiency,
+        pool,
+        is_virt_snap_func,
+        partition_name=None,
+        initial_repo_group_size_pct=None,
+    ):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         source_volume_name = self._get_volume_name_by_wwn(volume_id)
         source_cli_volume = self._get_cli_volume_in_pool_site(source_volume_name, pool)

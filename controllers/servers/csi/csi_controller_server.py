@@ -394,7 +394,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     array_mediator.verify_volume_partition(volume, array_connection_info.partition_name)
 
                     snapshot = array_mediator.create_snapshot(volume_id, snapshot_final_name, space_efficiency, pool,
-                                                              use_snap_object, array_connection_info.partition_name)
+                                                              use_snap_object, array_connection_info.partition_name,
+                                                              initial_repo_group_size_pct=snapshot_parameters.initial_repo_group_size_pct)
 
                 logger.debug("generating create snapshot response")
                 response = utils.generate_csi_create_snapshot_response(snapshot, system_id, source_id)

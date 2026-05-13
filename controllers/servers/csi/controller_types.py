@@ -48,6 +48,7 @@ class ObjectParameters:
     io_group: str
     volume_group: str
     virt_snap_func: bool
+    initial_repo_group_size_pct: int = None
 
 
 @dataclass

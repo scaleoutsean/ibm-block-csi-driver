@@ -183,7 +183,8 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
         self.mediator.get_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_UID, SNAPSHOT_NAME, expected_pool, False)
         self.mediator.create_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_UID, SNAPSHOT_NAME,
-                                                              expected_space_efficiency, expected_pool, False, None)
+                                                              expected_space_efficiency, expected_pool, False, None,
+                                                              initial_repo_group_size_pct=None)
         system_id_part = ':{}'.format(system_id) if system_id else ''
         snapshot_id = 'xiv{}:0;{}'.format(system_id_part, SNAPSHOT_VOLUME_UID)
         self.assertEqual(snapshot_id, response_snapshot.snapshot.snapshot_id)
@@ -199,6 +200,30 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.mediator.validate_supported_space_efficiency = Mock()
         self.request.parameters = {servers_settings.PARAMETERS_SPACE_EFFICIENCY: SPACE_EFFICIENCY}
         self._test_create_snapshot_succeeds(expected_space_efficiency=SPACE_EFFICIENCY)
+
+    def test_create_snapshot_with_initial_repo_group_size_pct_parameter_succeeds(self):
+        self._prepare_create_snapshot_mocks()
+        self.request.parameters = {servers_settings.PARAMETERS_INITIAL_REPO_GROUP_SIZE_PCT: "35"}
+
+        self.servicer.CreateSnapshot(self.request, self.context)
+
+        self.assertEqual(grpc.StatusCode.OK, self.context.code)
+        self.mediator.create_snapshot.assert_called_once_with(
+            SNAPSHOT_VOLUME_UID,
+            SNAPSHOT_NAME,
+            None,
+            None,
+            False,
+            None,
+            initial_repo_group_size_pct=35,
+        )
+
+    def test_create_snapshot_with_invalid_initial_repo_group_size_pct_parameter_fails(self):
+        self.request.parameters = {servers_settings.PARAMETERS_INITIAL_REPO_GROUP_SIZE_PCT: "abc"}
+
+        self.servicer.CreateSnapshot(self.request, self.context)
+
+        self.assertEqual(grpc.StatusCode.INVALID_ARGUMENT, self.context.code)
 
     def test_create_snapshot_with_space_efficiency_and_virt_snap_func_enabled_fail(self):
         self.request.parameters = {servers_settings.PARAMETERS_SPACE_EFFICIENCY: SPACE_EFFICIENCY,
@@ -293,7 +318,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.assertIn(msg, self.context.details)
         self.mediator.get_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_UID, SNAPSHOT_NAME, None, False)
         self.mediator.create_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_UID, SNAPSHOT_NAME, None, None, False,
-                                                              None)
+                                                              None, initial_repo_group_size_pct=None)
 
     def test_create_snapshot_with_not_found_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.NOT_FOUND,
@@ -337,7 +362,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
         full_name = "{}_{}".format(NAME_PREFIX, VOLUME_NAME)
         self.mediator.create_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_UID, full_name, None, None,
-                                                              False, None)
+                                                              False, None, initial_repo_group_size_pct=None)
 
 
 class TestDeleteSnapshot(BaseControllerSetUp, CommonControllerTest):

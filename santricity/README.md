@@ -154,7 +154,19 @@ deletionPolicy: Delete
 parameters:
   csi.storage.k8s.io/snapshotter-secret-name: demo-secret
   csi.storage.k8s.io/snapshotter-secret-namespace: default
+
+  # Optional: initial snapshot repository group size, as % of base volume.
+  # Used only when no eligible snapshot group exists and the driver must create one.
+  # Valid range: 1..100. Default when omitted: 20.
+  initial_repo_group_size_pct: "25"
 ```
+
+Notes:
+
+- `initial_repo_group_size_pct` applies to SANtricity snapshot-group creation only.
+- Existing snapshot groups are still preferred when eligible.
+- If omitted, behavior remains unchanged from previous releases (`20%`).
+- For a concise quick-reference note, see [Usage Details](../USAGE-DETAILS.md#santricity-snapshot-parameter).
 
 You can then create snapshots by referencing this class:
 

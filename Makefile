@@ -24,7 +24,7 @@ LDFLAGS?="-X ${PKG}/node/pkg/driver.gitCommit=${GIT_COMMIT} -X ${PKG}/node/pkg/d
 GO111MODULE=on
 DRIVER_CONFIG_YML=$(shell pwd)/common/config.yaml
 SANTRICITY_CLIENT_REPO?=https://github.com/scaleoutsean/santricity-client
-# SANTRICITY_CLIENT_REF?=0.2.7 # 0.2.7 exposes auto snapshot create 
+# SANTRICITY_CLIENT_REF?=0.2.8 # 0.2.7 exposes auto snapshot create 
 SANTRICITY_CLIENT_REF?=master
 # -race is not supported on Z
 GO_TEST_FLAGS=$(shell if [ "$$(uname -m)" = "s390x" ]; then echo "-v"; else echo "-v -race"; fi)

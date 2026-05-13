@@ -383,6 +383,27 @@ def _str_to_bool(parameter):
     return False
 
 
+def _parse_optional_int_parameter(parameter, parameter_name, *, minimum=None, maximum=None):
+    if parameter is None:
+        return None
+    try:
+        value = int(str(parameter).strip())
+    except (TypeError, ValueError):
+        raise ValidationException(
+            "{} parameter should be an integer".format(parameter_name)
+        )
+
+    if minimum is not None and value < minimum:
+        raise ValidationException(
+            "{} parameter should be >= {}".format(parameter_name, minimum)
+        )
+    if maximum is not None and value > maximum:
+        raise ValidationException(
+            "{} parameter should be <= {}".format(parameter_name, maximum)
+        )
+    return value
+
+
 def _normalize_utf8_text(value):
     """Return a UTF-8-safe string for gRPC/protobuf string fields."""
     if value is None:
@@ -406,15 +427,27 @@ def get_object_parameters(parameters, prefix_param_name, system_id):
     default_io_group = parameters.get(servers_settings.PARAMETERS_IO_GROUP)
     default_volume_group = parameters.get(servers_settings.PARAMETERS_VOLUME_GROUP)
     default_virt_snap_func = parameters.get(servers_settings.PARAMETERS_VIRT_SNAP_FUNC)
+    default_initial_repo_group_size_pct = parameters.get(servers_settings.PARAMETERS_INITIAL_REPO_GROUP_SIZE_PCT)
     virt_snap_func_str = system_parameters.get(servers_settings.PARAMETERS_VIRT_SNAP_FUNC, default_virt_snap_func)
     is_virt_snap_func = _str_to_bool(virt_snap_func_str)
+    initial_repo_group_size_pct_raw = system_parameters.get(
+        servers_settings.PARAMETERS_INITIAL_REPO_GROUP_SIZE_PCT,
+        default_initial_repo_group_size_pct,
+    )
+    initial_repo_group_size_pct = _parse_optional_int_parameter(
+        initial_repo_group_size_pct_raw,
+        servers_settings.PARAMETERS_INITIAL_REPO_GROUP_SIZE_PCT,
+        minimum=1,
+        maximum=100,
+    )
     return ObjectParameters(
         pool=system_parameters.get(servers_settings.PARAMETERS_POOL, default_pool),
         space_efficiency=system_parameters.get(servers_settings.PARAMETERS_SPACE_EFFICIENCY, default_space_efficiency),
         prefix=system_parameters.get(prefix_param_name, default_prefix),
         io_group=system_parameters.get(servers_settings.PARAMETERS_IO_GROUP, default_io_group),
         volume_group=system_parameters.get(servers_settings.PARAMETERS_VOLUME_GROUP, default_volume_group),
-        virt_snap_func=is_virt_snap_func)
+        virt_snap_func=is_virt_snap_func,
+        initial_repo_group_size_pct=initial_repo_group_size_pct)
 
 
 def get_volume_id(new_volume, system_id):

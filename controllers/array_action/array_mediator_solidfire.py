@@ -236,7 +236,16 @@ class SolidFireArrayMediator(ArrayMediatorAbstract):
     def change_host_protocol(self, host_name, protocol):
         return None
 
-    def create_snapshot(self, volume_id, snapshot_name, pool, space_efficiency, is_virt_snap_func):
+    def create_snapshot(
+        self,
+        volume_id,
+        snapshot_name,
+        space_efficiency,
+        pool,
+        is_virt_snap_func,
+        partition_name=None,
+        initial_repo_group_size_pct=None,
+    ):
         raise NotImplementedError()
 
     def delete_snapshot(self, snapshot_id, internal_snapshot_id, snapshot_name=None):

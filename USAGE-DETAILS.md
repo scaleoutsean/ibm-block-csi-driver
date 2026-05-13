@@ -355,6 +355,30 @@ daemonset.extensions/ibm-block-csi-node     2       2         2          2      
 <br/>
 <br/>
 
+## SANtricity Snapshot Parameter
+
+For SANtricity deployments, `VolumeSnapshotClass` can optionally define `initial_repo_group_size_pct`.
+
+For full SANtricity snapshot setup guidance, see [santricity/README.md](santricity/README.md#snapshot-support).
+
+- Purpose: controls initial concatenated repository group size (percent of source volume) when the driver must create a new snapshot group.
+- Valid range: `1..100`.
+- Default if omitted: `20`.
+- Existing eligible snapshot groups are still preferred and reused.
+
+Example:
+
+```yaml
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: santricity-snapclass
+driver: santricity.block.csi.ibm.com
+deletionPolicy: Delete
+parameters:
+  initial_repo_group_size_pct: "25"
+```
+
 ## Licensing
 
 Copyright 2025 IBM Corp.
