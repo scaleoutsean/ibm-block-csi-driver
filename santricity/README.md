@@ -68,10 +68,15 @@ Various thin distributions are not supported, so if you're looking for a SANtric
 
 ### Operator-based deployment
 
-IBM Block Storage CSI Driver requires an "operator". You may use pre-configured YAML files.
+IBM Block Storage CSI Driver requires an "operator". You may use the pre-configured YAML file for the operator. **Note**: In this fork, the operator and driver are both isolated in the `santricity` namespace by default (unlike upstream which uses `default`).
 
 ```sh
+# Create the namespace first!
+kubectl create namespace santricity
+
+# Deploy the operator and CRDs
 kubectl apply -f ./deploy/santricity-solidfire/ibm-block-csi-operator.yaml
+
 # Wait for CRDs to be registered by the API server before applying the custom resource
 kubectl wait --for=condition=Established --timeout=120s crd/hostdefiners.csi.ibm.com
 kubectl wait --for=condition=Established --timeout=120s crd/hostdefinitions.csi.ibm.com
@@ -93,11 +98,14 @@ vim ./deploy/santricity-solidfire/secret-santricity.yaml # edit TLS verify, cred
 
 ## Storage Configuration
 
-The driver supports two types of SANtricity storage entities: **Traditional Volume Groups** and **Dynamic Disk Pools (DDP)**.
+The driver supports two types of SANtricity storage entities: **Traditional Volume Groups** and **Dynamic Disk Pools (DDP)**:
+
+- Traditional ("classic") disk groups: rigid capacity "islands" with very predictable behavior and granular (precise) capacity allocation. Suitable for many small (<32GB) volumes with specific requirements
+- DDP: flexible "lakes" of capacity with dual volume RAID type (RAID 10 and RAID 6) capability. Has coarse allocation (~4GiB increments), otherwise recommended over classic disk groups
 
 ### 1. Traditional Volume Groups (RAID 1/5/6)
 
-Traditional groups define the RAID level at the group level. Volumes created in these groups inherit the group's RAID properties. Do **not** specify `SpaceEfficiency` in the `StorageClass`.
+Traditional groups define the RAID level at the group level. Volumes created in these groups inherit the group's RAID properties. Do **not** specify `SpaceEfficiency` in the `StorageClass` with classic RAID.
 
 **Sample StorageClass:**
 
