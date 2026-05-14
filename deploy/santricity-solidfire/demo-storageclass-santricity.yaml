@@ -4,9 +4,8 @@ metadata:
   name: demo-storageclass-santricity
   annotations:
     storageclass.kubernetes.io/is-default-class: "false"   # Set to "true" to make this the default StorageClass. Only one default StorageClass should exist per cluster.
-    # k10.kasten.io/is-snapshot-class: "true"                # Uncomment for SC backup with Kasten K10
 provisioner: santricity.block.csi.ibm.com
-reclaimPolicy: Retain                # MUST be set to 'Retain' if snapshot-based "backup" is desired (Velero, Kasten) so that the host volume isn't deleted during restore processes where the namespace is overwritten.
+reclaimPolicy: Delete                # Set to 'Retain' to avoid deleting the underlying storage asset when a PVC is deleted. 'Delete' will delete the underlying storage asset when a PVC is deleted.
 parameters:
   pool: "data"                       # SANtricity Pool ID or Pool Label (e.g. "040000006D039EA0004D008700000F55693865CC" or "Pool_01")
   # SpaceEfficiency: raid6           # (Optional) SANtricity RAID level hint (raid1, raid6) for DDP pools. 

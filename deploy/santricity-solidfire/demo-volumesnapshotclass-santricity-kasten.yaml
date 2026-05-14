@@ -2,6 +2,8 @@ apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshotClass
 metadata:
   name: demo-volumesnapshotclass-santricity
+  annotations:
+    k10.kasten.io/is-snapshot-class: "true" # Uncommented for snapshot-based backup with Kasten K10
 driver: santricity.block.csi.ibm.com
 deletionPolicy: Delete # Delete will remove the snapshot when the volume snapshot is deleted.
 parameters:
