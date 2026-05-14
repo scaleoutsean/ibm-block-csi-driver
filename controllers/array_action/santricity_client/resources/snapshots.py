@@ -72,6 +72,10 @@ class SnapshotsResource(ResourceBase):
         """Create a new snapshot volume (pitView - read-only or read/write)."""
         return self._post("/snapshot-volumes", payload)
 
+    def delete_snapshot_volume(self, volume_ref: str) -> None:
+        """Delete a snapshot volume by pitViewRef / id."""
+        self._delete(f"/snapshot-volumes/{volume_ref}")
+
     def list_repositories(self) -> list[dict[str, Any]]:
         """List concatenated repository volumes backing snapshot groups and linked clones."""
         return self._get("/repositories/concat")
