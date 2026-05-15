@@ -1,0 +1,24 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: demo-kasten-santricity-sc
+provisioner: santricity.block.csi.ibm.com
+reclaimPolicy: Delete                # Auto-deletes Linked Clones after backup ("export") is done
+parameters:
+  pool: "data"                       # SANtricity Pool ID or Pool Label (e.g. "040000006D039EA0004D008700000F55693865CC" or "Pool_01")
+  # SpaceEfficiency: raid6           # (Optional) SANtricity RAID level hint (raid1, raid5, raid6, raid10)
+                                     # Defaults to raid6 for DDP pools if not specified. Volumes on traditional pools (VGs) follow the VG's RAID level.
+  volume_name_prefix: kstn           # (Optional) Makes it easier to differentiate Kasten-made Linked Clones from other volumes in SANtricity UI
+
+  csi.storage.k8s.io/fstype: xfs     # Since this one is used to mount Linked Clones which are already formatted, it should use the same FS type.
+                                     # Maybe marking this out would work for "default" FS type, but I have not tested what happens in 
+                                     # ambiguous situations (base volume uses unusual filesystem, this SC sets a different FS, etc.)
+  csi.storage.k8s.io/secret-name: santricity-secret
+  csi.storage.k8s.io/secret-namespace: santricity
+  csi.storage.k8s.io/provisioner-secret-name: santricity-secret
+  csi.storage.k8s.io/provisioner-secret-namespace: santricity
+  csi.storage.k8s.io/controller-publish-secret-name: santricity-secret
+  csi.storage.k8s.io/controller-publish-secret-namespace: santricity
+  csi.storage.k8s.io/node-stage-secret-name: santricity-secret
+  csi.storage.k8s.io/node-stage-secret-namespace: santricity
+allowVolumeExpansion: false

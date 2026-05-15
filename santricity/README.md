@@ -20,7 +20,7 @@ These are the capabilities the driver explicitly reports to Kubernetes during th
   - CREATE_DELETE_VOLUME (Dynamic Provisioning)
   - CREATE_DELETE_SNAPSHOT (Snapshots) 
   - PUBLISH_UNPUBLISH_VOLUME (Attach/Detach)
-  - CLONE_VOLUME (Volume Cloning)
+  - CLONE_VOLUME (Volume Cloning) (Note: individual snapshots and read-only Linked Clones are enabled)
   - EXPAND_VOLUME (Offline/Online Resizing)
 - Node Capabilities: Hardcoded in node.go:37.
   - STAGE_UNSTAGE_VOLUME (Mount/Unmount)
@@ -158,7 +158,7 @@ parameters:
 
 ## Snapshot Support
 
-Upstream (IBM Block Driver CSI) does not implement Volume Group Snapshots as of v1.13.2. Therefore, only individual volume snapshots are currently available in this patch.
+Upstream (IBM Block Driver CSI) does not implement Volume *Group* Snapshots as of v1.13.2. Therefore, only individual volume snapshots are currently available in this patch as well.
 
 For snapshot provisioning and deletion to work, make sure that Kubernetes external snapshotter CRDs, Snapshot Controller, and an appropriate `VolumeSnapshotClass` are installed in your cluster.
 
@@ -207,6 +207,14 @@ spec:
   source:
     persistentVolumeClaimName: demo-pvc-santricity
 ```
+
+### Integration with data protection applications
+
+Keep in mind that IBM Block CSI does not offer in-place storage snapshots restore.
+
+Consequently, if you create a volume snapshot class for in-Kubernetes snapshots, but for *manual* in-place snapshot restores, you'd want the `Retain` reclaim policy on the SC and Volume Storage Class. But if you use Kasten and have backup-to-S3 (or other "export") policies, you want to to use a *special* SC for backup-to-S3, so that ephemeral SANtricity Linked Clones get deleted after export jobs finish. An example can be found in `./deplo/santricity-solidfire/`.
+
+Take a look at the [Kasten](https://scaleoutsean.github.io/2026/05/12/veeam-kasten-santricity-csi-netapp-eseries.html#tools) post to see more about this topic. There's a short demo-post with [Velero](https://scaleoutsean.github.io/2026/04/30/velero-csi-data-mover-backup-santricity-kubernetes.html) as well.
 
 ## Call Home and Privacy
 
@@ -343,22 +351,15 @@ spec:
 
 SANtricity DDP allocates storage in 4 GiB chunks, so on small PVCs (less than 20 GB) you may see allocated more than you think or expect. It is recommended to use 4 GiB "units" and over 10 GiB sizes on DDP. Traditional disk groups (RAID 1/5/6) allocate precisely.
 
-There are no quotas or other fancy features. Try [santricity-go](https://github.com/scaleoutsean/santricity-go/csi/) for status reporting, or watch your array performance and capacity in a monitoring system such as [EPA](https://github.com/scaleoutsean/eseries-perf-analyzer).
+There are no quotas or other fancy features. Try [santricity-go](https://github.com/scaleoutsean/santricity-go/csi/) for status reporting, and watch array performance and capacity in a monitoring system such as [EPA](https://github.com/scaleoutsean/eseries-perf-analyzer).
 
-IBM Block Storage CSI drivers creates (too?) unique volume names that aren't supposed to be readable by humans. And that's fine, PVC names are readable but impossible to memorize anyway. This fork attaches Kubernetes PVC metadata tags to SANtricity volumes, so if you use ESC (mentioned above) you can track them in InfluxDB and watch them in Grafana. What's injected in SANtricity volume metadata:
+IBM Block Storage CSI drivers creates (too?) unique volume names that aren't supposed to be readable by humans. Use this [santricity-client](https://github.com/scaleoutsean/santricity-client/tree/master/scripts) for Kubernetes-to-SANtricity volume mapping or crete your own.
 
-- pvc_name - from csi.storage.k8s.io/pvc/name  
-- pvc_namespace - from csi.storage.k8s.io/pvc/namespace
-- pv_name - from csi.storage.k8s.io/pv/name
-- fstype - from csi.storage.k8s.io/fstype
+SANtricity snapshots must be deleted in strict order of creation, which means you can't delete the second oldest snapshot without deleting the oldest before it. Secondly, the API allows "yanking", so deleting a volume deletes without warnings all snapshots and linked clones that depend on it and deleting a snapshot "disables" all linked clones that depend on it.
 
-SANtricity snapshots must be deleted in strict order of creation, which means you can't delete the second oldest snapshot without deleting the oldest before it. Secondly, the API allows "yanking", so deleting a volume deletes without warnings all snapshots and linked clones that depend on it.
+### SolidFire Support
 
-## SolidFire Support
-
-There's a "stub" for a SolidFire (iSCSI) driver as well. I've been focused on SolidFire CSI (my "CSI from scratch done right" project), so SolidFire support in IBM Block Storage CSI will probably not be delivered unless someone needs it.
-
-If anyone is interested (OpenShift users, etc.) in getting this done, let me know in Issues. Because SolidFire uses iSCSI, adopting it would be easier than it was for SANtricity.
+There's a "stub" for a SolidFire (iSCSI) driver as well, but SolidFire support in IBM Block Storage CSI will probably not be delivered unless someone needs it. I have a stand-alone SolidFire CSI in Go and it turned out really well (as far as I can tell), so I think there isn't much value in adding SolidFire support here, although it can be done.
 
 ## IBM Block Driver CSI Support
 
