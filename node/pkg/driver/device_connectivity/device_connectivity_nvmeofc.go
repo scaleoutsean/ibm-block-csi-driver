@@ -408,8 +408,8 @@ func (r OsDeviceConnectivityNvmeOFc) getNvmeDevice(volumeId string) (string, err
 		wwid := strings.TrimSpace(string(content))
 		// Check if uniqueId is in wwid (case-insensitive) or vice versa
 		// This handles cases where volumeRef contains metadata not in the host WWID
-		lWwid := strings.ToLower(wwid)
-		lUniqueId := strings.ToLower(uniqueId)
+		lWwid := strings.ReplaceAll(strings.ToLower(wwid), "-", "")
+		lUniqueId := strings.ReplaceAll(strings.ToLower(uniqueId), "-", "")
 		if strings.Contains(lWwid, lUniqueId) || strings.Contains(lUniqueId, lWwid) {
 			deviceName := filepath.Base(f)
 			devicePath := filepath.Join("/dev", deviceName)

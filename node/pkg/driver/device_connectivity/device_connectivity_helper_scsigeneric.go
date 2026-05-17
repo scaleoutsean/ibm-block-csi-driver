@@ -282,8 +282,8 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	if files, err := r.Executer.FilepathGlob("/sys/block/nvme*n*"); err == nil {
 		for _, f := range files {
 			if content, err := r.Executer.IoutilReadFile(filepath.Join(f, "wwid")); err == nil {
-				wwid := strings.ToLower(strings.TrimSpace(string(content)))
-				lUnique := strings.ToLower(uniqueId)
+				wwid := strings.ReplaceAll(strings.ToLower(strings.TrimSpace(string(content))), "-", "")
+				lUnique := strings.ReplaceAll(strings.ToLower(uniqueId), "-", "")
 				if strings.Contains(wwid, lUnique) || strings.Contains(lUnique, wwid) {
 					devicePath := filepath.Join("/dev", filepath.Base(f))
 					logger.Infof("GetMpathDevice: Found native NVMe device %s for volume %s, bypassing multipath search", devicePath, volumeId)
