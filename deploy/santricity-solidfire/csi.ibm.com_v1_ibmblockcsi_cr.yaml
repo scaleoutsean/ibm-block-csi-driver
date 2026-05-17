@@ -27,7 +27,6 @@ spec:
                   operator: In
                   values:
                     - amd64
-                    - s390x
                     - ppc64le
 
   # node is a daemonSet with ibm-block-csi-node container
@@ -45,7 +44,6 @@ spec:
                   operator: In
                   values:
                     - amd64
-                    - s390x
                     - ppc64le
 
 #    tolerations:

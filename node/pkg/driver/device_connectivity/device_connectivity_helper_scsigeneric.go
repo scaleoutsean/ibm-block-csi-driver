@@ -111,6 +111,18 @@ func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volum
 		return false, err
 	}
 
+	if strings.HasPrefix(mpathDeviceName, "nvme") && strings.Contains(mpathDeviceName, "n") {
+		if content, err := r.Executer.IoutilReadFile(filepath.Join("/sys/block", mpathDeviceName, "wwid")); err == nil {
+			wwid := strings.ReplaceAll(strings.ToLower(strings.TrimSpace(string(content))), "-", "")
+			for _, volumeIdVariation := range volumeIdVariations {
+				lUnique := strings.ReplaceAll(strings.ToLower(volumeIdVariation), "-", "")
+				if strings.Contains(wwid, lUnique) || strings.Contains(lUnique, wwid) {
+					return true, nil
+				}
+			}
+		}
+	}
+
 	dmDirectory := DevPath
 	multipathdCommandFormatArgs := multipathdWildcardsMpathAndVolumeId
 	if r.Helper.IsDmName(mpathDeviceName) {
