@@ -216,6 +216,18 @@ Consequently, if you create a volume snapshot class for in-Kubernetes snapshots,
 
 Take a look at the [Kasten](https://scaleoutsean.github.io/2026/05/12/veeam-kasten-santricity-csi-netapp-eseries.html#tools) post to see more about this topic. There's a short demo-post with [Velero](https://scaleoutsean.github.io/2026/04/30/velero-csi-data-mover-backup-santricity-kubernetes.html) as well.
 
+## KubeVirt and Raw Block Volumes
+
+IBM Block Storage CSI Driver explicitly supports provisioning raw block volumes (`volumeMode: Block`), which is a requirement for native hypervisor performance with KubeVirt.
+
+You do not need to create a dedicated or special StorageClass for block volumes; you can reuse your existing classes (like `santricity-ddp-pool` or `santricity-traditional-vg`). The block mode allocation is simply requested by the end-user by setting `volumeMode: Block` inside the `PersistentVolumeClaim`.
+
+An example demonstrating a KubeVirt VM booting CirrOS from a containerDisk and attaching a 1GiB SANtricity raw block volume as a secondary disk is available in the deploy examples:
+
+```sh
+kubectl apply -f ./deploy/santricity-solidfire/kubevirt-cirros-block.yaml
+```
+
 ## Call Home and Privacy
 
 For this SANtricity fork, call-home registration to storage arrays is **not** sent.

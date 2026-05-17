@@ -798,7 +798,7 @@ def _get_supported_capability(volume_capability):
             access_mode=access_mode)
 
     return csi_pb2.VolumeCapability(
-        mount=csi_pb2.VolumeCapability.BlockVolume(),
+        block=csi_pb2.VolumeCapability.BlockVolume(),
         access_mode=access_mode)
 
 
