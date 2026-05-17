@@ -105,7 +105,7 @@ type NodeUtilsInterface interface {
 	UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName string, iscsiIQN string, fcWWNs []string, nvmeNQN string) error
 	IsBlock(devicePath string) (bool, error)
 	GetFileSystemVolumeStats(path string) (VolumeStatistics, error)
-	GetBlockVolumeStats(volumeId string) (VolumeStatistics, error)
+	GetBlockVolumeStats(volumePath string) (VolumeStatistics, error)
 }
 
 type NodeUtils struct {
@@ -712,14 +712,8 @@ func (d NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, erro
 	return volumeStats, nil
 }
 
-func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error) {
-	volumeUuid := d.GetVolumeUuid(volumeId)
-	mpathDevice, err := d.osDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
-	if err != nil {
-		return VolumeStatistics{}, err
-	}
-
-	args := []string{"--getsize64", mpathDevice}
+func (d NodeUtils) GetBlockVolumeStats(volumePath string) (VolumeStatistics, error) {
+	args := []string{"--getsize64", volumePath}
 	out, err := d.Executer.ExecuteWithTimeoutSilently(device_connectivity.TimeOutBlockDevCmd, BlockDevCmd, args)
 	if err != nil {
 		return VolumeStatistics{}, err

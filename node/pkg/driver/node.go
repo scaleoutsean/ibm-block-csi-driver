@@ -519,11 +519,20 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		fsType := volumeCap.GetMount().FsType
 		err = d.publishFileSystemVolume(stagingPath, targetPath, fsType)
 	} else {
+		connectivityType, lun, arraySerial, _, errInfo := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext)
+		if errInfo != nil {
+			return nil, status.Error(codes.Internal, errInfo.Error())
+		}
+		osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "Wrong connectivity type %s", connectivityType)
+		}
+
 		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
-		if err != nil {
-			logger.Errorf("Error while discovering the device : {%v}", err.Error())
-			return nil, status.Error(codes.Internal, err.Error())
+		mpathDevice, errMpath := osDeviceConnectivity.GetMpathDevice(volumeUuid, lun, arraySerial)
+		if errMpath != nil {
+			logger.Errorf("Error while discovering the device : {%v}", errMpath.Error())
+			return nil, status.Error(codes.Internal, errMpath.Error())
 		}
 		logger.Debugf("Discovered device : {%v}", mpathDevice)
 
@@ -761,7 +770,7 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 	}
 
 	if isBlock {
-		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(volumeId)
+		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(path)
 		if err != nil {
 			switch err.(type) {
 			case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
