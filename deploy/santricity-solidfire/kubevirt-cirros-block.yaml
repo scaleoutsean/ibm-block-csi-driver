@@ -9,7 +9,7 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: demo-storageclass-santricity
+  storageClassName: santricity-ddp-pool
 ---
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
@@ -28,9 +28,6 @@ spec:
             - name: blockdisk
               disk:
                 bus: virtio
-            - name: fsdisk
-              disk:
-                bus: virtio
         resources:
           requests:
             memory: 128Mi
@@ -41,20 +38,3 @@ spec:
         - name: blockdisk
           persistentVolumeClaim:
             claimName: santricity-block-pvc
-        - name: fsdisk
-          persistentVolumeClaim:
-            claimName: santricity-fs-pvc
-
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: santricity-fs-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  volumeMode: Filesystem
-  resources:
-    requests:
-      storage: 1Gi
-  storageClassName: demo-storageclass-santricity
