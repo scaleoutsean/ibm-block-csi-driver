@@ -517,7 +517,8 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	if isFSVolume {
 		fsType := volumeCap.GetMount().FsType
-		err = d.publishFileSystemVolume(stagingPath, targetPath, fsType)
+		logger.Warningf(">>> SEAN: NodePublishVolume branching to FS volume (stagingPath: %s, targetPath: %s)", stagingPath, targetPath)
+                err = d.publishFileSystemVolume(stagingPath, targetPath, fsType)
 	} else {
 		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
 		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
@@ -527,7 +528,8 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		}
 		logger.Debugf("Discovered device : {%v}", mpathDevice)
 
-		err = d.publishRawBlockVolume(mpathDevice, targetPath)
+		logger.Warningf(">>> SEAN: NodePublishVolume branching to Raw Block volume (mpathDevice: %s)", mpathDevice)
+                err = d.publishRawBlockVolume(mpathDevice, targetPath)
 	}
 
 	if err != nil {
@@ -719,7 +721,8 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		return nil, status.Errorf(codes.NotFound, "volume path %q does not exist", volumePath)
 	}
 
-	volumeStats, err := d.getVolumeStats(volumePathWithHostPrefix, volumeId)
+	logger.Warningf(">>> SEAN: NodeGetVolumeStats entering getVolumeStats for path %v", volumePathWithHostPrefix)
+        volumeStats, err := d.getVolumeStats(volumePathWithHostPrefix, volumeId)
 	if err != nil {
 		return nil, err
 	}
@@ -761,7 +764,8 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 	}
 
 	if isBlock {
-		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(volumeId)
+		logger.Warningf(">>> SEAN: getVolumeStats detected BLOCK, calling GetBlockVolumeStats")
+                volumeStats, err = d.NodeUtils.GetBlockVolumeStats(volumeId)
 		if err != nil {
 			switch err.(type) {
 			case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
@@ -771,7 +775,8 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 			}
 		}
 	} else {
-		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeId)
+		logger.Warningf(">>> SEAN: getVolumeStats detected FILE SYSTEM, bypassing multipath block path")
+                volumeUuid := d.NodeUtils.GetVolumeUuid(volumeId)
 		isVolumePathMatchesVolumeId, err := d.OsDeviceConnectivityHelper.IsVolumePathMatchesVolumeId(volumeUuid, path)
 		if err != nil {
 			return VolumeStatistics{}, status.Errorf(codes.Internal,
